@@ -95,48 +95,18 @@ public class Simulator {
 
     /**
      * Integrate from t0 to tf using Dormand-Prince 8(5,3).
+     * Delegates to the ProcessModel for the right-hand side rates.
      */
-    public static BioreactorState integrate(
+    public BioreactorState integrate(
         BioreactorState state, Map<String, Double> params, double t0, double tf
     ) {
         if (tf <= t0) return state;
 
         OrdinaryDifferentialEquation ode = new OrdinaryDifferentialEquation() {
-            @Override public int getDimension() { return 9; }
+            @Override public int getDimension() { return BioreactorState.STATE_SIZE - 1; } // 9
             @Override public double[] computeDerivatives(double t, double[] y) {
                 BioreactorState s = BioreactorState.fromStateVector(t, y);
-
-                // Use the MonodModel rates directly here (simplified for now)
-                double mu_max  = params.getOrDefault("mu_max", 0.70);
-                double K_s     = params.getOrDefault("K_s", 0.02);
-                double Y_XS    = params.getOrDefault("Y_XS", 0.50);
-                double m_s     = params.getOrDefault("m_s", 0.025);
-                double alpha   = params.getOrDefault("alpha", 0.0);
-                double beta    = params.getOrDefault("beta", 0.02);
-                double k_d_val = params.getOrDefault("k_d", 0.01);
-                double k_lys   = params.getOrDefault("k_lysis", 0.005);
-
-                double T_min = 8.0, T_opt = 37.0, T_max = 45.0;
-                double pH_opt = 7.0, pH_sigma = 0.8;
-
-                double f_T = EnvironmentFactors.tempFactorCardinal(s.temperature(), T_min, T_opt, T_max);
-                double f_pH = EnvironmentFactors.phFactorGaussian(s.pH(), pH_opt, pH_sigma);
-
-                double S = Math.max(0, s.substrate());
-                double mu = mu_max * (S / (K_s + S)) * f_T * f_pH;
-                double q_S = (Y_XS > 0 ? mu / Y_XS : 0) + m_s;
-                double q_B = alpha * mu + beta;
-
-                double k_d_act = k_d_val * Math.max(0, 1.0 - S / (S + K_s));
-                double dXv = (mu - k_d_act) * s.xv();
-                double dXd = k_d_act * s.xv() - k_lys * s.xd();
-                double dS_v = -q_S * s.xv();
-                double dP = 0.0;
-                double dB = q_B * s.xv();
-                double dV = 0.0;
-                double dT = 0.0;
-
-                return new double[]{dXv, dXd, dS_v, dP, dB, 0.0, dV, dT, 0.0};
+                return model.rates(s, params);
             }
         };
 
