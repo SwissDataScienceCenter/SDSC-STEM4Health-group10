@@ -98,23 +98,24 @@ public class DTBDataReader {
             }
         }
 
-        // Build events from feed rows
+        // Build events from feed rows (feed volumes are already in L)
+        // Feed B is the main substrate feed
         List<Simulator.Event> events = new ArrayList<>();
         for (int i = 0; i < feedBTimes.size(); i++) {
             double t = feedBTimes.get(i);
-            double dV = feedBVals.get(i) / 1000.0; // convert mL to L
+            double dV = feedBVals.get(i); // L
             events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 500.0)));
         }
-        // Feed C and D are also added (concentrations are fitted)
+        // Feed C and D are minor feeds (could be inducer/alkali)
         for (int i = 0; i < feedCTimes.size(); i++) {
             double t = feedCTimes.get(i);
-            double dV = feedCVals.get(i) / 1000.0;
-            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 500.0)));
+            double dV = feedCVals.get(i); // L
+            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 0.0)));
         }
         for (int i = 0; i < feedDTimes.size(); i++) {
             double t = feedDTimes.get(i);
-            double dV = feedDVals.get(i) / 1000.0;
-            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 500.0)));
+            double dV = feedDVals.get(i); // L
+            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 0.0)));
         }
 
         // Sampling events: set volume to measured volume
