@@ -119,4 +119,11 @@ public class DTBV2Model implements ProcessModel {
             default -> Map.of();
         };
     }
+
+    /** Convenience: params as a Map with defaults. */
+    public Map<String, Double> defaultParams() {
+        Map<String, Double> p = new HashMap<>();
+        for (ModelParameter mp : parameters()) p.put(mp.name(), mp.startValue());
+        return p;
+    }
 }

@@ -114,11 +114,12 @@ public class Simulator {
         BioreactorState state, Map<String, Double> params, double t0, double tf
     ) {
         if (tf <= t0) return state;
+        int dim = state.stateSize();
 
         OrdinaryDifferentialEquation ode = new OrdinaryDifferentialEquation() {
-            @Override public int getDimension() { return BioreactorState.STATE_SIZE - 1; } // 9
+            @Override public int getDimension() { return dim; }
             @Override public double[] computeDerivatives(double t, double[] y) {
-                BioreactorState s = BioreactorState.fromStateVector(t, y);
+                BioreactorState s = BioreactorState.fromStateVector(t, y, model.hiddenStateCount());
                 return model.rates(s, params);
             }
         };
@@ -129,6 +130,7 @@ public class Simulator {
         ODEState initState = new ODEState(t0, state.stateVector());
         ODEState finalState = integrator.integrate(ode, initState, tf);
 
-        return BioreactorState.fromStateVector(tf, finalState.getPrimaryState());
+        return BioreactorState.fromStateVector(tf, finalState.getPrimaryState(),
+                                                model.hiddenStateCount());
     }
 }
