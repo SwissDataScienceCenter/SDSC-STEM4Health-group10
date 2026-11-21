@@ -103,7 +103,8 @@ public class RK4Simulator {
 
                 for (int i = 0; i < x.length; i++) {
                     x[i] = x[i] + dt / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
-                    if (x[i] < 0 && i >= 2 && i <= 4) x[i] = 0;  // clip concentrations
+                    // Clip all concentration fields (not Xv/Xd which are handled by model)
+                    if (x[i] < 0 && i >= 2) x[i] = 0;
                 }
             }
 
