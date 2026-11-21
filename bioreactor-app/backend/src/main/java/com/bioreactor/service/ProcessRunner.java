@@ -3,6 +3,8 @@ package com.bioreactor.service;
 import com.bioreactor.engine.*;
 import com.bioreactor.engine.ConfigurableModel.OrganismConfig;
 import com.bioreactor.model.*;
+import com.bioreactor.monitoring.MonitoringEngine;
+import com.bioreactor.monitoring.MonitoringEngine.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +18,10 @@ import java.util.*;
  * Given a manufacturing run (from the long-format data store), this service:
  *   1. Loads the batch's initial conditions, feed events, and offline measurements
  *   2. Simulates the expected trajectory using the organism's ConfigurableModel
- *   3. Compares measured vs predicted values (MonitoringEngine)
- *   4. Computes process trends (TrendingEngine) across batches
- *   5. Generates forward predictions (PredictionEngine) from current state
+ *   3. Compares measured vs predicted values (model mismatch detection)
+ *   4. Checks against reference bands from training data (MonitoringEngine)
+ *   5. Computes process trends (TrendingEngine) across batches
+ *   6. Generates forward predictions (PredictionEngine) from current state
  *
  * This is the core of the production bioreactor manufacturing application —
  * fed-batch process analysis and deviation detection for any organism.
@@ -60,6 +63,60 @@ public class ProcessRunner {
     }
 
     /**
+     * Build reference bands from all training runs for a given process.
+     * Uses the monitoring engine to compute p10/p50/p90 on a common time grid.
+     */
+    public Map<String, ReferenceBand> buildReferenceBands(String processId) {
+        // Get all training run IDs for this process
+        List<String> runIds = jdbc.queryForList(
+            "SELECT id FROM run WHERE process_id = ?::uuid AND role = 'TRAIN'",
+            String.class, processId);
+
+        if (runIds.size() < 3) return Map.of(); // need at least 3 runs for meaningful bands
+
+        // Collect time series for each parameter
+        String[] params = {"vcd", "tcd", "substrate", "byproduct"};
+        Map<String, List<double[]>> timeMap = new HashMap<>();
+        Map<String, List<double[]>> valueMap = new HashMap<>();
+        for (String p : params) { timeMap.put(p, new ArrayList<>()); valueMap.put(p, new ArrayList<>()); }
+
+        // Build common time grid (min start, max end across runs)
+        double globalStart = Double.MAX_VALUE, globalEnd = 0;
+
+        for (String runId : runIds) {
+            List<TimePoint> readings = loadReadings(runId);
+            if (readings.isEmpty()) continue;
+            globalStart = Math.min(globalStart, readings.get(0).time);
+            globalEnd = Math.max(globalEnd, readings.get(readings.size() - 1).time);
+
+            for (String p : params) {
+                double[] t = new double[readings.size()];
+                double[] v = new double[readings.size()];
+                for (int i = 0; i < readings.size(); i++) {
+                    t[i] = readings.get(i).time;
+                    v[i] = readings.get(i).get(p, Double.NaN);
+                }
+                timeMap.get(p).add(t);
+                valueMap.get(p).add(v);
+            }
+        }
+
+        // Common grid: 50 points evenly spaced
+        int gridPoints = 50;
+        double[] commonGrid = new double[gridPoints];
+        for (int i = 0; i < gridPoints; i++) {
+            commonGrid[i] = globalStart + i * (globalEnd - globalStart) / (gridPoints - 1);
+        }
+
+        Map<String, ReferenceBand> bands = new HashMap<>();
+        for (String p : params) {
+            if (timeMap.get(p).size() < 3) continue;
+            bands.put(p, MonitoringEngine.buildBand(p, timeMap.get(p), valueMap.get(p), commonGrid));
+        }
+        return bands;
+    }
+
+    /**
      * Load feed events for a given run.
      */
     public List<FeedEvent> loadFeedEvents(String runId) {
@@ -88,7 +145,7 @@ public class ProcessRunner {
      */
     public Map<String, Object> loadRunMeta(String runId) {
         return jdbc.queryForMap(
-            "SELECT r.id, r.code, r.kind, r.role, p.name as process_name, p.time_unit " +
+            "SELECT r.id, r.code, r.kind, r.role, r.process_id, p.name as process_name, p.time_unit " +
             "FROM run r JOIN process_definition p ON r.process_id = p.id WHERE r.id = ?::uuid", runId);
     }
 
@@ -100,8 +157,9 @@ public class ProcessRunner {
      *  2. Load initial state from the first reading
      *  3. Build feed events from run_event table
      *  4. Simulate expected trajectory
-     *  5. Compare measurements to simulation → deviation report
-     *  6. Return structured ProcessReport
+     *  5. Compare measurements to simulation → model mismatch findings
+     *  6. Check against reference bands → outside-band findings
+     *  7. Report summary metrics
      */
     @Transactional(readOnly = true)
     public ProcessReport analyzeRun(String runId, String organismId) {
@@ -119,7 +177,7 @@ public class ProcessRunner {
 
         if (readings.isEmpty()) {
             return new ProcessReport(runId, organismId, "NO_DATA", "No readings found for run", 0,
-                List.of(), List.of(), List.of(), System.currentTimeMillis() - start);
+                List.of(), List.of(), List.of(), List.of(), System.currentTimeMillis() - start);
         }
 
         // 3. Initial state from first reading
@@ -145,14 +203,19 @@ public class ProcessRunner {
         RK4Simulator sim = new RK4Simulator(model, 0.01);
         RK4Simulator.SimResult simResult = sim.simulate(initialState, params, simEvents, tEnd);
 
-        // 6. Compare: at each measurement time, interpolate simulation
+        // 6. Build reference bands from training runs (if available)
+        var runMeta = loadRunMeta(runId);
+        String processId = runMeta != null ? runMeta.get("process_id").toString() : null;
+        Map<String, ReferenceBand> bands = processId != null ? buildReferenceBands(processId) : Map.of();
+
+        // 7. Compare: at each measurement time, check model mismatch AND reference band
         List<Deviation> deviations = new ArrayList<>();
+        List<FindingInfo> findings = new ArrayList<>();
+
         for (TimePoint tp : readings) {
-            // Interpolate simulation state at this time
             BioreactorState simState = interpolate(simResult, tp.time);
             if (simState == null) continue;
 
-            // Check each measured variable against simulation
             for (var entry : tp.values.entrySet()) {
                 String code = entry.getKey();
                 double measured = entry.getValue();
@@ -169,21 +232,37 @@ public class ProcessRunner {
                 double absError = measured - predicted;
                 double relError = predicted > 0 ? absError / predicted * 100 : 0;
 
+                // Model mismatch check
                 if (Math.abs(relError) > 15.0) {
                     deviations.add(new Deviation(tp.time, code, measured, predicted,
                         absError, relError,
                         Math.abs(relError) > 30.0 ? "HIGH" : "MODERATE"));
+                    findings.add(new FindingInfo(tp.time, code,
+                        Math.abs(relError) > 30.0 ? "ALARM" : "WARNING",
+                        "MODEL_MISMATCH",
+                        String.format("%s=%.3f vs predicted %.3f (%.1f%% error)",
+                            code, measured, predicted, relError)));
+                }
+
+                // Reference band check
+                ReferenceBand band = bands.get(code);
+                if (band != null) {
+                    String bandMsg = band.check(tp.time, measured);
+                    if (bandMsg != null) {
+                        findings.add(new FindingInfo(tp.time, code, "WARNING",
+                            "OUTSIDE_REFERENCE_BAND", bandMsg));
+                    }
                 }
             }
         }
 
-        // 7. Summarize key metrics
+        // 8. Summarize key metrics
         List<Metric> metrics = summarizeMetrics(readings, simResult, tEnd);
 
         long elapsed = System.currentTimeMillis() - start;
         return new ProcessReport(runId, organismId, "OK",
             "Analysis complete in " + elapsed + "ms", tEnd,
-            readings, deviations, metrics, elapsed);
+            readings, deviations, findings, metrics, elapsed);
     }
 
     /** Interpolate simulation state at a given time. */
@@ -231,6 +310,58 @@ public class ProcessRunner {
         return metrics;
     }
 
+    // ── Trending: control charts across batches ──
+
+    /**
+     * Compute trending analysis (I-MR control charts) for a set of batches.
+     * Returns control chart data and violation descriptions.
+     */
+    public TrendReport trendAnalysis(String processId, String parameterCode) {
+        List<String> runIds = jdbc.queryForList(
+            "SELECT id FROM run WHERE process_id = ?::uuid AND role = 'TRAIN'",
+            String.class, processId);
+
+        if (runIds.isEmpty()) {
+            return new TrendReport(parameterCode, 0.0, 0.0, 0.0, 0.0, 0.0, List.of(), List.of());
+        }
+
+        // Extract metric values (e.g. peak VCD) per batch
+        double[] values = new double[runIds.size()];
+        String[] batchIds = new String[runIds.size()];
+        for (int i = 0; i < runIds.size(); i++) {
+            batchIds[i] = runIds.get(i);
+            var readings = loadReadings(runIds.get(i));
+            values[i] = switch (parameterCode) {
+                case "peak_vcd" -> readings.stream().mapToDouble(tp -> tp.get("vcd", 0)).max().orElse(0);
+                case "final_vcd" -> {
+                    var last = readings.get(readings.size() - 1);
+                    yield last.get("vcd", 0);
+                }
+                case "harvest_titer" -> {
+                    var last = readings.get(readings.size() - 1);
+                    yield last.get("substrate", 0);
+                }
+                default -> readings.stream().mapToDouble(tp -> tp.get(parameterCode, 0)).average().orElse(0);
+            };
+        }
+
+        // Build I-MR chart
+        var chart = com.bioreactor.trending.TrendingEngine.buildIMRChart(
+            parameterCode, batchIds, values);
+
+        // Compute Cpk if possible
+        double mean = chart.centreLine();
+        double sigma = mean > 0 ? (chart.ucl() - mean) / 3.0 : 0;
+        double cpk = sigma > 0 ? Math.min(mean / (3 * sigma), mean / (3 * sigma)) : 0;
+
+        double[] vals = chart.values();
+        List<Double> boxed = new ArrayList<>(vals.length);
+        for (double v : vals) boxed.add(v);
+        return new TrendReport(
+            parameterCode, mean, sigma, chart.ucl(), chart.lcl(), cpk,
+            boxed, chart.violations());
+    }
+
     // ── Data types ──
 
     public record TimePoint(double time, Map<String, Double> values) {
@@ -242,9 +373,16 @@ public class ProcessRunner {
     public record Deviation(double time, String parameter, double measured, double predicted,
                             double absError, double relErrorPct, String severity) {}
 
+    public record FindingInfo(double elapsedTime, String parameterCode, String severity,
+                              String kind, String message) {}
+
     public record Metric(String code, double value, String unit, String description) {}
 
     public record ProcessReport(String runId, String organismId, String status, String message,
                                 double tEnd, List<TimePoint> readings, List<Deviation> deviations,
-                                List<Metric> metrics, long elapsedMs) {}
+                                List<FindingInfo> findings, List<Metric> metrics, long elapsedMs) {}
+
+    public record TrendReport(String parameterCode, double mean, double sigma,
+                              double ucl, double lcl, double cpk,
+                              List<Double> values, List<String> violations) {}
 }

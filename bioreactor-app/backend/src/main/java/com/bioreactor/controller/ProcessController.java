@@ -61,4 +61,13 @@ public class ProcessController {
         ProcessReport report = runner.analyzeRun(runId, organismId);
         return ResponseEntity.ok(report);
     }
+
+    /** Trending analysis across training batches. */
+    @GetMapping("/trends")
+    public ResponseEntity<TrendReport> trendAnalysis(
+        @RequestParam String processId,
+        @RequestParam(defaultValue = "peak_vcd") String parameter) {
+        TrendReport report = runner.trendAnalysis(processId, parameter);
+        return ResponseEntity.ok(report);
+    }
 }
