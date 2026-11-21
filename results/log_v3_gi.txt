@@ -38,3 +38,40 @@
   [v3_gi fold6] 3500 simulations, current SSE/2 = 161.7
   [v3_gi fold6] 4000 simulations, current SSE/2 = 161.7
   [v3_gi fold6] 4500 simulations, current SSE/2 = 161.7
+  [v3_gi fold6] 5000 simulations, current SSE/2 = 161.7
+  [v3_gi fold6] 5500 simulations, current SSE/2 = 161.7
+  [v3_gi fold6] 6000 simulations, current SSE/2 = 161.7
+[v3_gi fold6] DONE: fit on 42 batches in 2157s (cost 161.7)
+[v3_gi] full fit: cost=189.5 nfev=76 success=True (861s)
+          estimate  ci95_low      ci95_high  at_bound
+mu_max      4.7061    3.4315   6.454200e+00     False
+Ks          2.7068    1.6757   4.372300e+00     False
+K_N         0.3527    0.2153   5.780000e-01     False
+Yxn        41.9660   40.4167   4.357480e+01     False
+C_Nb        0.0001    0.0000  1.155303e+103      True
+kd0         0.0000    0.0000  1.014232e+304      True
+kd_N        0.0317    0.0070   1.442000e-01     False
+K_dN        0.0004    0.0000   3.000000e-03     False
+kd_D        0.0044    0.0004   5.070000e-02     False
+k_r         1.0907    0.1450   8.205400e+00     False
+k_lys       0.0491    0.0019   1.270900e+00     False
+Yxs     10000.0000    0.0000  3.003885e+100      True
+m           0.0580    0.0507   6.650000e-02     False
+q_ovf       1.9319    0.5984   6.237100e+00     False
+K_ovf       2.6141    2.5350   2.695700e+00     False
+n_ovf      20.0000   11.1419   3.590040e+01      True
+K_iP        0.1759    0.0462   6.692000e-01     False
+Yps         1.3356    1.1914   1.497400e+00     False
+qPc         2.0000    0.3459   1.156410e+01      True
+K_Pc       28.3586    4.3237   1.860011e+02     False
+C_sub       1.0000    0.0000   7.281471e+08      True
+C_b        74.4559   68.8183   8.055540e+01     False
+K_IP        0.7582    0.4661   1.233600e+00     False
+
+[v3_gi] cross-validation (7 folds by batch):
+            RMSE  relRMSE_%  MARE_%
+vcd        2.540     12.260  13.416
+tcd        2.633     12.190  13.213
+dcd        0.241     27.223  32.973
+substrate  0.421     18.442  19.372
+byproduct  0.324     21.416  18.527
