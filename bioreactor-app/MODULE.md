@@ -57,15 +57,23 @@ cd bioreactor-app/backend
 - [x] Reference band: p10 ≤ p50 ≤ p90
 - [x] Monitoring detects band violations
 - [x] I-MR control chart built
+- [x] Java-vs-Python port validation (Monod batch: VCD MARE 0.0001%, Sub MARE 0.0001%)
+- [x] V2 model with default params: VCD MAPE 18.8%, TCD 18.5% on real Batch1
+- [x] Feed architecture: per-stream concentrations resolved from model (fixes 500g/L bug)
 
-## Not verified
+## In progress
 
-- [ ] Java-vs-Python numerical comparison (port check)
-- [ ] Fitting on real DTB training data (needs active DB + Java DB reader)
-- [ ] `DTBDataReader.loadDTBBatch()` tested on real batches
-- [ ] MAPE on DTB test batches matches team v3 (~8.6% VCD, ~8.5% TCD, ~19.8% substrate, ~18.5% byproduct)
+- [ ] Fitting on real DTB training data — model works, LM fitting is slow with adaptive ODE
+- [ ] Substrate runs to zero at t~7 in V2 (need C_b tuning or hidden nutrient from V3)
+- [ ] Byproduct overflow metabolism MARE 20% vs Python (missing in Java MonodModel)
+
+## Not yet done
+
+- [ ] MAPE on DTB batches matching team v3 (~8.6% VCD, ~8.5% TCD, ~19.8% sub)
+- [ ] Fast fixed-step RK4 simulator (needed for real-data fitting performance)
 - [ ] Submission file generation (156 rows, correct format)
-- [ ] ProcessBuilder Python call removed (still in SimulationService)
-- [ ] Vaadin UI (not started)
+- [ ] `DTBDataReader` tested on all real batches
+- [ ] ProcessBuilder Python call removed from SimulationService
+- [ ] Vaadin UI
 - [ ] Flyway V3-V6 applied on real DB
 - [ ] BRPMM mapping file
