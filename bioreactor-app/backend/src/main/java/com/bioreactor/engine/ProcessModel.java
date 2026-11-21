@@ -2,6 +2,7 @@ package com.bioreactor.engine;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Interface for a mechanistic process model.
@@ -13,9 +14,15 @@ public interface ProcessModel {
     /** Parameters that can be fitted, with start values and bounds. */
     List<ModelParameter> parameters();
 
+    /** Number of hidden/internal state variables (beyond the 9 core states). Default 0. */
+    default int hiddenStateCount() { return 0; }
+
+    /** Indices of hidden states NOT diluted by feeds (e.g. damage history). Default empty. */
+    default java.util.Set<Integer> undilutedHiddenIndices() { return java.util.Collections.emptySet(); }
+
     /**
      * Rates of change for each state variable, given the current state and parameters.
-     * Returns a double[] of length STATE_SIZE-1 (no time derivative).
+     * Returns a double[] of length CORE_STATE_SIZE + hiddenStateCount().
      */
     double[] rates(BioreactorState state, Map<String, Double> params);
 
