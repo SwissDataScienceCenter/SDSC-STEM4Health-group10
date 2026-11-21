@@ -1,0 +1,58 @@
+# Bioreactor Application - Docker Compose
+# One-command startup for full stack:
+#   docker-compose up -d
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bioreactor-db
+    environment:
+      POSTGRES_DB: bioreactor
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: bioreactor123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d bioreactor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  java-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bioreactor-api
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bioreactor
+      SPRING_DATASOURCE_USERNAME: appuser
+      SPRING_DATASOURCE_PASSWORD: bioreactor123
+      BIOREACTOR_PYTHON_PATH: /usr/bin/python3
+      BIOREACTOR_PYTHON_SCRIPT: /app/python_sim/run_simulation.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/python_sim:/app/python_sim
+
+  streamlit:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bioreactor-ui
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://java-api:8080/api
+    depends_on:
+      - java-api
+
+volumes:
+  pgdata:
