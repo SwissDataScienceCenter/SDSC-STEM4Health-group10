@@ -16,17 +16,20 @@ import java.util.*;
  * Parameter fitting using bounded Levenberg-Marquardt (Hipparchus).
  * Fits a ProcessModel on all training batches with shared parameters.
  *
- * Ported from Python: src/mechanistic.py fit() with f_scale / loss='linear'.
+ * Ported from Python: src/mechanistic.py fit(), simulate(), with f_scale / loss='linear'.
  * Loss follows the leaderboard MAPE metric (relative error on 4 variables).
+ *
+ * Uses fixed-step RK4 (dt=0.01, like the Python team's simulator) for speed during fitting.
+ * The adaptive DormandPrince853 Simulator is still available for high-accuracy single runs.
  */
 public class Fitter {
 
     private final ProcessModel model;
-    private final Simulator simulator;
+    private final RK4Simulator rk4;
 
     public Fitter(ProcessModel model) {
         this.model = model;
-        this.simulator = new Simulator(model);
+        this.rk4 = new RK4Simulator(model, 0.01);
     }
 
     /** A single batch of training data. */
@@ -249,7 +252,7 @@ public class Fitter {
             train.remove(i);
 
             FitResult fit = fit(train, maxIterPerFold);
-            Simulator.SimulationResult pred = predict(heldOut, fit.fittedParams());
+            RK4Simulator.SimResult pred = predict(heldOut, fit.fittedParams());
 
             for (int j = 1; j < heldOut.times().size(); j++) {
                 double t = heldOut.times().get(j);
@@ -287,10 +290,10 @@ public class Fitter {
         );
     }
 
-    /** Predict a single batch from its initial state + events only. */
-    public Simulator.SimulationResult predict(TrainingBatch batch, Map<String, Double> params) {
+    /** Predict a single batch from its initial state + events only. Uses fixed-step RK4. */
+    public RK4Simulator.SimResult predict(TrainingBatch batch, Map<String, Double> params) {
         double tEnd = batch.times().isEmpty() ? 10 : batch.times().getLast() * 1.05;
-        return simulator.simulate(batch.initialState(), params, batch.events(), tEnd, 0.05);
+        return rk4.simulate(batch.initialState(), params, batch.events(), tEnd);
     }
 
     // --- private helpers ---
@@ -329,38 +332,46 @@ public class Fitter {
         return points;
     }
 
-    /** Weighted relative error: (pred - obs)/max(|obs|, epsilon) */
+    /**
+     * Log residuals: log(pred) - log(obs) for each observation.
+     * This aligns the least-squares cost with MAPE (relative error metric).
+     * Ported from Python mechanistic.py fit(residual="log").
+     */
     private double[] computeResiduals(List<TrainingBatch> batches,
                                        Map<String, Double> params,
                                        List<ResidualPoint> points) {
         // Simulate all batches once
-        Map<String, Simulator.SimulationResult> simResults = new HashMap<>();
+        Map<String, RK4Simulator.SimResult> simResults = new HashMap<>();
         for (var b : batches)
             simResults.put(b.id(), predict(b, params));
 
         double[] residuals = new double[points.size()];
-        double eps = 0.5; // floor for relative error denominator
+        double minVal = 1e-6;  // floor for log of small values
 
         for (int i = 0; i < points.size(); i++) {
             ResidualPoint pt = points.get(i);
-            Simulator.SimulationResult sim = simResults.get(pt.batchId());
+            RK4Simulator.SimResult sim = simResults.get(pt.batchId());
             if (sim == null) { residuals[i] = 0; continue; }
 
             BioreactorState s = nearestState(sim, pt.t());
+            double pred, obs;
 
             if (!Double.isNaN(pt.observedVcd())) {
-                double denom = Math.max(Math.abs(pt.observedVcd()), eps);
-                residuals[i] = (s.xv() - pt.observedVcd()) / denom;
+                pred = Math.max(s.xv(), minVal);
+                obs = Math.max(pt.observedVcd(), minVal);
+                residuals[i] = Math.log(pred) - Math.log(obs);
             } else if (!Double.isNaN(pt.observedTcd())) {
-                double denom = Math.max(Math.abs(pt.observedTcd()), eps);
-                double tcdPred = s.xv() + s.xd();
-                residuals[i] = (tcdPred - pt.observedTcd()) / denom;
+                pred = Math.max(s.xv() + s.xd(), minVal);
+                obs = Math.max(pt.observedTcd(), minVal);
+                residuals[i] = Math.log(pred) - Math.log(obs);
             } else if (!Double.isNaN(pt.observedSub())) {
-                double denom = Math.max(Math.abs(pt.observedSub()), eps);
-                residuals[i] = (s.substrate() - pt.observedSub()) / denom;
+                pred = Math.max(s.substrate(), minVal);
+                obs = Math.max(pt.observedSub(), minVal);
+                residuals[i] = Math.log(pred) - Math.log(obs);
             } else if (!Double.isNaN(pt.observedByp())) {
-                double denom = Math.max(Math.abs(pt.observedByp()), eps);
-                residuals[i] = (s.byproduct() - pt.observedByp()) / denom;
+                pred = Math.max(s.byproduct(), minVal);
+                obs = Math.max(pt.observedByp(), minVal);
+                residuals[i] = Math.log(pred) - Math.log(obs);
             }
         }
         return residuals;
@@ -443,7 +454,7 @@ public class Fitter {
         return map;
     }
 
-    private static BioreactorState nearestState(Simulator.SimulationResult r, double t) {
+    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
         int idx = 0;
         for (int i = 0; i < r.times().size(); i++) {
             if (r.times().get(i) >= t) { idx = i; break; }

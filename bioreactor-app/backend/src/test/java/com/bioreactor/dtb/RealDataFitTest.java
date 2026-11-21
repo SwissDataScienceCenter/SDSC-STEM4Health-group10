@@ -141,7 +141,7 @@ class RealDataFitTest {
         );
     }
 
-    private static BioreactorState nearestState(Simulator.SimulationResult r, double t) {
+    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
         int idx = 0;
         for (int i = 0; i < r.times().size(); i++) {
             if (r.times().get(i) >= t) { idx = i; break; }

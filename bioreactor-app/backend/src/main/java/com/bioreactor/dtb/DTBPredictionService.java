@@ -87,7 +87,7 @@ public class DTBPredictionService {
     /** A single row of output. */
     public record TrialOutput(
         String batchId,
-        Simulator.SimulationResult result,
+        RK4Simulator.SimResult result,
         List<Double> targetTimes
     ) {
         /** Interpolate simulation to the target (measurement) times. */
