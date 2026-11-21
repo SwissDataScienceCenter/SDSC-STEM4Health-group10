@@ -128,9 +128,13 @@ public class Fitter {
             optimum = optimizer.optimize(problem);
         } catch (org.hipparchus.exception.MathIllegalStateException e) {
             System.err.println("WARNING: Fitter hit evaluation limit (" + maxFunctionEvals + ")");
-            return new FitResult(
-                arrayToMap(spec, start), arrayToMap(spec, start), false,
-                Double.POSITIVE_INFINITY, computeMAPE(batches, arrayToMap(spec, start)), 0);
+            // start is unconstrained; convert to natural scale for the fallback result
+            double[] startNatural = new double[spec.size()];
+            for (int i = 0; i < spec.size(); i++)
+                startNatural[i] = spec.get(i).fromUnconstrained(start[i]);
+            Map<String, Double> sm = arrayToMap(spec, startNatural);
+            return new FitResult(sm, sm, false,
+                Double.POSITIVE_INFINITY, computeMAPE(batches, sm), 0);
         }
 
         // Map fitted params back to natural scale
