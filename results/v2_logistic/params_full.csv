@@ -1,0 +1,18 @@
+,estimate,ci95_low,ci95_high,at_bound,unit,meaning
+mu_max,2.195325233474869,0.7522666045974747,6.406575609335067,False,1/d,maximum specific growth rate
+Ks,4.999476553798624,0.8001254488095324,31.23855871497484,True,g/L,Monod half-saturation constant for substrate (growth)
+kd0,1.0005979802238418e-05,0.0,1.0142320547350045e+304,True,1/d,basal specific death rate
+kd_S,1.9998172340042624,1.678785394462188e-183,2.3822395540328965e+183,True,1/d,extra death rate under substrate limitation
+K_dS,0.012577653699835241,1.784427666350684e-188,8.865440475741566e+183,False,g/L,substrate level below which extra death kicks in
+k_lys,0.00010028495095793789,0.0,1.0142320547350045e+304,False,1/d,lysis rate of dead cells
+Yxs,199.99999999999974,5.764096052620781,6939.509618652684,True,cells/g,biomass yield on substrate (growth part)
+m,0.03217285967456667,0.027577084202826722,0.03753453019276268,False,g/(cells d),maintenance substrate uptake
+q_ovf,0.4050832737778891,0.3213758428445921,0.5105936315629129,False,g/(cells d),maximum overflow uptake
+K_ovf,3.7153300424915914,3.4940256748204805,3.9506513716015523,False,g/L,substrate level for half-maximal overflow
+n_ovf,11.999999999999995,9.556512251539257,15.068258817625223,True,-,steepness (Hill coefficient) of the overflow switch
+Yps,1.478235371050056,1.3183899854129273,1.6574608700012887,False,g/g,byproduct produced per substrate overflowed
+qPc,0.07120613616071267,0.014673732358098506,0.34553675255904603,False,g/(cells d),maximum specific byproduct consumption
+K_Pc,6.126956443841659,1.0441715852805715,35.9515579564884,False,g/L,half-saturation of byproduct consumption
+C_sub,43.502816825476515,26.80075948611814,70.61348663388476,False,g/L,substrate concentration in the substrate feed
+C_b,17.2056249514863,14.592374060022722,20.286865506156506,False,g/L,substrate concentration in Feed B
+Xmax,30.264089016651084,28.994146613849022,31.589654843308782,False,1e6 cells/mL,carrying capacity (logistic brake)
