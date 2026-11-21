@@ -19,6 +19,7 @@
     
     <properties>
         <java.version>21</java.version>
+        <hipparchus.version>3.1</hipparchus.version>
     </properties>
     
     <dependencies>
@@ -51,6 +52,50 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        
+        <!-- Flyway DB migration -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        
+        <!-- Hipparchus: ODE integration, optimisation, statistics -->
+        <dependency>
+            <groupId>org.hipparchus</groupId>
+            <artifactId>hipparchus-core</artifactId>
+            <version>${hipparchus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hipparchus</groupId>
+            <artifactId>hipparchus-ode</artifactId>
+            <version>${hipparchus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hipparchus</groupId>
+            <artifactId>hipparchus-optim</artifactId>
+            <version>${hipparchus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hipparchus</groupId>
+            <artifactId>hipparchus-stat</artifactId>
+            <version>${hipparchus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hipparchus</groupId>
+            <artifactId>hipparchus-fitting</artifactId>
+            <version>${hipparchus.version}</version>
+        </dependency>
+        
+        <!-- Apache Commons CSV -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.11.0</version>
         </dependency>
         
         <!-- Test -->
