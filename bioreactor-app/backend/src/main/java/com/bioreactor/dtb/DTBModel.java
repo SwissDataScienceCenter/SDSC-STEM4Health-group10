@@ -1,82 +1,106 @@
 package com.bioreactor.dtb;
 
 import com.bioreactor.engine.*;
-import org.hipparchus.ode.*;
-import org.hipparchus.ode.nonstiff.DormandPrince853Integrator;
-
 import java.util.*;
 
 /**
- * DTB-specific process model for the hackathon challenge.
+ * DTB-specific process model — port of team's V1 mechanisms (mechanistic.py).
  *
- * Ported from Python: src/mechanistic.py (team's reference model on main) and
- * parameter_estimation.custom_ode.
- *
- * Key differences from the textbook MonodModel:
- * - Time is in days.
- * - Cells, byproduct, and product do not enter with the feed.
- * - Feed concentrations for each stream are fitted parameters.
- * - Volume is set to the measured volume at each sampling time.
+ * Key differences from textbook MonodModel:
+ *   - Time is in DAYS (CHO mammalian culture, ~14 d)
+ *   - Cell units: 1e6 cells/mL (per spec: "VCD" = viable cell density)
+ *     Y_XS is therefore "cells/g" not "g/g"
+ *   - Smooth substrate switch-off (EPS_S = 0.05 g/L) to avoid negative S
+ *   - Death rate constant (simple model)
+ *   - Feed B and feed_substrate carry substrate; feed C and D are inert
+ *   - Volume is reset to measured value at each sampling time
  */
 public class DTBModel implements ProcessModel {
+
+    private static final double EPS_S = 0.05;  // smooth switch-off for substrate uptake
 
     @Override
     public List<ModelParameter> parameters() {
         return List.of(
-            new ModelParameter("mu_max",   0.70,  0.001, 5.0,   "1/d",  "Maximum specific growth rate"),
-            new ModelParameter("K_s",      0.02,  0.0001, 5.0,  "g/L",  "Substrate half-saturation"),
-            new ModelParameter("Y_XS",     0.50,  0.01,  0.95,  "g/g",  "Biomass yield on substrate"),
-            new ModelParameter("m_s",      0.025, 0.0,   0.5,   "g/g/d","Maintenance coefficient"),
-            new ModelParameter("alpha",    0.0,   0.0,   1.0,   "g/g",  "Growth-associated byproduct"),
-            new ModelParameter("beta",     0.005, 0.0,   0.1,   "1/d",  "Non-growth byproduct rate"),
-            new ModelParameter("k_d",      0.005, 0.0,   0.1,   "1/d",  "Maximum death rate"),
-            new ModelParameter("k_lysis",  0.001, 0.0,   0.05,  "1/d",  "Lysis rate"),
-            new ModelParameter("feedB_S",  500.0, 10.0, 1000.0, "g/L",  "Feed B substrate concentration"),
-            new ModelParameter("feedC_S",  500.0, 10.0, 1000.0, "g/L",  "Feed C substrate concentration"),
-            new ModelParameter("feedD_S",  500.0, 10.0, 1000.0, "g/L",  "Feed D substrate concentration")
+            // Growth
+            new ModelParameter("mu_max",   1.0,   0.1,  5.0,   "1/d",      "Max specific growth rate"),
+            new ModelParameter("Ks",       0.1,   1e-3, 5.0,   "g/L",      "Monod half-saturation"),
+            new ModelParameter("kd",       0.02,  1e-5, 1.0,   "1/d",      "Specific death rate"),
+            new ModelParameter("Yxs",      5.0,   0.1,  200.0, "cells/g",  "Biomass yield on substrate"),
+            new ModelParameter("m",        0.1,   1e-5, 2.0,   "g/(cells d)","Maintenance coefficient"),
+            // Byproduct (Luedeking-Piret)
+            new ModelParameter("alpha",    0.6,   1e-5, 10.0,  "g/cells",  "Growth-associated byproduct"),
+            new ModelParameter("beta",     0.01,  1e-6, 2.0,   "g/(cells d)","Non-growth byproduct rate"),
+            // Feed concentrations
+            new ModelParameter("C_sub",    250.0, 10.0, 3000.0,"g/L",      "Substrate conc in substrate feed"),
+            new ModelParameter("C_b",      50.0,  0.1,  1000.0,"g/L",      "Substrate conc in Feed B")
         );
     }
 
     @Override
-    public double[] rates(BioreactorState state, Map<String, Double> params) {
-        double mu_max  = params.getOrDefault("mu_max", 0.70);
-        double K_s     = params.getOrDefault("K_s", 0.02);
-        double Y_XS    = params.getOrDefault("Y_XS", 0.50);
-        double m_s     = params.getOrDefault("m_s", 0.025);
-        double alpha   = params.getOrDefault("alpha", 0.0);
-        double beta    = params.getOrDefault("beta", 0.005);
-        double k_d_val = params.getOrDefault("k_d", 0.005);
-        double k_lys   = params.getOrDefault("k_lysis", 0.001);
+    public double[] rates(BioreactorState state, Map<String, Double> p) {
+        double mu_max = p.getOrDefault("mu_max", 1.0);
+        double Ks     = p.getOrDefault("Ks", 0.1);
+        double kd     = p.getOrDefault("kd", 0.02);
+        double Yxs    = p.getOrDefault("Yxs", 5.0);
+        double m      = p.getOrDefault("m", 0.1);
+        double alpha  = p.getOrDefault("alpha", 0.6);
+        double beta   = p.getOrDefault("beta", 0.01);
 
-        double xv = Math.max(0, state.xv());
-        double xd = Math.max(0, state.xd());
-        double substrate = Math.max(0, state.substrate());
+        double Xv = Math.max(0, state.xv());
+        double Xd = Math.max(0, state.xd());
+        double S  = Math.max(0, state.substrate());
 
-        // Monod: μ = μ_max * S / (K_s + S)
-        double mu = mu_max * substrate / (K_s + substrate);
+        // Smooth switch-off: fS = S / (EPS_S + S)
+        double fS = S / (EPS_S + S);
 
-        // Pirt: q_S = μ / Y_XS + m_s
-        double q_S = (Y_XS > 0 ? mu / Y_XS : 0) + m_s;
+        // Monod growth
+        double mu = mu_max * S / (Ks + S);
 
-        // Luedeking-Piret: byproduct from overflow
-        double q_B = alpha * mu + beta;
+        // Pirt uptake (with switch-off)
+        double qS = mu / Yxs + m * fS;
 
-        // Death: function of growth rate
-        double k_d_actual = k_d_val * Math.max(0, 1.0 - mu / Math.max(mu_max, 1e-9));
-        double dXv = (mu - k_d_actual) * xv;
-        double dXd = k_d_actual * xv - k_lys * xd;
+        // Luedeking-Piret byproduct
+        double qP = alpha * mu + beta;
 
-        // Substrate consumption
-        double dS = -q_S * xv;
+        double dXv = (mu - kd) * Xv;
+        double dXd = kd * Xv;
+        double dS  = -qS * Xv;
+        double dP  = qP * Xv;   // byproduct — index 4 in rates array is "byproduct"
 
-        return new double[]{dXv, dXd, dS, 0.0, q_B * xv,
-                            0.0, 0.0, 0.0, 0.0};
+        // returns [dXv, dXd, dS, dProduct(primary), dByproduct, dDO, dV, dT, dpH]
+        return new double[]{dXv, dXd, dS, 0.0, dP, 0.0, 0.0, 0.0, 0.0};
     }
 
     @Override
-    public Map<String, Double> feedConcentrations(Map<String, Double> params) {
+    public Map<String, Double> feedConcentrations(Map<String, Double> p) {
+        // Returns the concentration of each state in the feed.
+        // State vector: [Xv, Xd, S, P(primary), B(byproduct), DO, V, T, pH]
+        // Only substrate (index 2) enters with the feed.
+        double C_sub = p.getOrDefault("C_sub", 250.0);
+        double C_b   = p.getOrDefault("C_b", 50.0);
+
+        // Default feed: substrate feed and Feed B carry substrate; Feed C/D carry 0
         return Map.of(
-            "substrate", params.getOrDefault("feedB_S", 500.0)
+            "substrate", C_sub,
+            "feed_b", C_b
         );
+    }
+
+    /**
+     * Feed concentration vector for a specific feed stream.
+     * Returns the full 9-state concentration vector for mass balance calculations.
+     * Index: 0=Xv, 1=Xd, 2=S(glucose), 3=P(primary), 4=B(byproduct), 5=DO, 6=V, 7=T, 8=pH
+     */
+    public static double[] feedConcentrationVector(String feedName, Map<String, Double> params) {
+        double[] c = new double[9];
+        switch (feedName) {
+            case "substrate", "feed_substrate" ->
+                c[2] = params.getOrDefault("C_sub", 250.0);
+            case "feed_b" ->
+                c[2] = params.getOrDefault("C_b", 50.0);
+            // feed_c and feed_d: no substrate (inert feeds)
+        }
+        return c;
     }
 }
