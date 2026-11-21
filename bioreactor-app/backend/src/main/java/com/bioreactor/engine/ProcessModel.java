@@ -24,4 +24,28 @@ public interface ProcessModel {
      * Keys are feed names (e.g. "substrate", "byproduct"). Omitted keys = 0.
      */
     Map<String, Double> feedConcentrations(Map<String, Double> params);
+
+    /**
+     * Per-feed-stream concentration lookup. Default delegates to feedConcentrations().
+     * @param feedName e.g. "feed_b", "feed_c", "substrate"
+     * @return map of state variable name to concentration in the feed (e.g. {"substrate": 50.0})
+     */
+    default Map<String, Double> feedStreamConcentrations(String feedName, Map<String, Double> params) {
+        Map<String, Double> all = feedConcentrations(params);
+        Double c = all.get(feedName);
+        if (c != null && c > 0) {
+            return Map.of("substrate", c);
+        }
+        // Check for "feed_b" → "feedB_S" style mappings in older models
+        String paramKey = switch (feedName) {
+            case "feed_b" -> "feedB_S";
+            case "feed_c" -> "feedC_S";
+            case "feed_d" -> "feedD_S";
+            default -> null;
+        };
+        if (paramKey != null && params.containsKey(paramKey)) {
+            return Map.of("substrate", params.get(paramKey));
+        }
+        return Map.of();
+    }
 }

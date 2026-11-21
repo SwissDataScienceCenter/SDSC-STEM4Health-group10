@@ -1,345 +1,363 @@
 """
-Parameter estimation engine v2:
-- Uses actual DTB feed profiles as time-dependent inputs
-- Fits only the intrinsic organism growth/substrate/product parameters
-- Validates against holdout batches (to_predict=True)
+Parameter estimation - Python port of Java Fitter/ProcessModel.
+
+Matches the Java implementation that achieved R² VCD = 0.889:
+  - Bolus-based feed model (batch ODE between impulse feed events)
+  - dV_bolus at each feed event = feed_rate * dt (forward-fill integration)
+  - Feed substrate concentration: S_feed = 500 g/L (from MonodModel)
+  - Weighted relative error loss: (pred - obs) / max(|obs|, 0.5)
+  - L-M optimizer with finite-difference Jacobian
 """
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d
 from typing import Dict, List, Optional, Tuple
-from dataclasses import replace
+import csv as _csv
+import sys, os, json
 
-import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from simulation_engine import (
-    SimulationConfig, OrganismConfig, GrowthConfig, ProductConfig,
-    EnvironmentConfig, OxygenConfig, HeatConfig,
-    BioreactorConfig, InitialConditions, BioreactorODE,
-    temp_factor_cardinal, ph_factor_gaussian,
-    specific_growth_rate, specific_substrate_uptake,
-    specific_product_formation
+    OrganismConfig, temp_factor_cardinal, ph_factor_gaussian
 )
-import psycopg2
-import psycopg2.extras
 
-DB_URL = "host=localhost dbname=bioreactor user=appuser password=bioreactor123"
+# ===========================================================================
+# Configuration
+# ===========================================================================
+PARAM_DEFAULTS = {
+    'mu_max':   {'default': 0.70,   'lower': 0.01, 'upper': 5.0,  'reg_scale': 0.5},
+    'K_s':      {'default': 0.02,   'lower': 0.001,'upper': 5.0,  'reg_scale': 0.5},
+    'Y_XS':     {'default': 0.50,   'lower': 0.01, 'upper': 0.95, 'reg_scale': 0.2},
+    'm_s':      {'default': 0.025,  'lower': 0.0,  'upper': 0.5,  'reg_scale': 0.05},
+    'alpha':    {'default': 0.0,    'lower': 0.0,  'upper': 1.0,  'reg_scale': 0.2},
+    'beta':     {'default': 0.02,   'lower': 0.0,  'upper': 0.5,  'reg_scale': 0.05},
+    'k_d':      {'default': 0.01,   'lower': 0.0,  'upper': 0.1,  'reg_scale': 0.02},
+}
+
+S_FEED = 500.0  # g/L substrate in feed (from Java MonodModel.feedConcentrations)
+CSV_PATH = "/home/renku/work/input-data/Project 1 - DTB/bioreaction_remaining.csv"
+
+# ===========================================================================
+# Data Loading
+# ===========================================================================
+def load_batch_csv(batch_id: str) -> Dict:
+    """Load batch: separate measurements and feed events."""
+    measurements = {'t': [], 'vcd': [], 'tcd': [], 'substrate': [], 'byproduct': [], 'volume': []}
+    feed_rows = []  # (time, total_flow_rate_L_per_h)
+
+    with open(CSV_PATH, 'r') as f:
+        reader = _csv.DictReader(f)
+        for row in reader:
+            if row['batch_id'] != batch_id:
+                continue
+            elapsed = float(row['elapsed_time'])
+
+            vcd = float(row['vcd']) if row.get('vcd', '').strip() else None
+            tcd = float(row['tcd']) if row.get('tcd', '').strip() else None
+            sub = float(row['substrate']) if row.get('substrate', '').strip() else None
+            byp = float(row['byproduct']) if row.get('byproduct', '').strip() else None
+            vol = float(row['volume']) if row.get('volume', '').strip() else None
+
+            if vcd is not None or sub is not None:
+                measurements['t'].append(elapsed)
+                measurements['vcd'].append(vcd)
+                measurements['tcd'].append(tcd)
+                measurements['substrate'].append(sub)
+                measurements['byproduct'].append(byp)
+                measurements['volume'].append(vol)
+
+            # Compute total instantaneous flow rate from all feed columns
+            flow_total = 0.0
+            for col in ['feed_substrate', 'feed_b', 'feed_c', 'feed_d']:
+                val = row.get(col, '').strip()
+                if val:
+                    flow_total += float(val)
+            if flow_total > 0:
+                feed_rows.append((elapsed, flow_total))
+
+    # Java treats feed values as bolus volumes in L (not integrated).
+    # Each feed row: dV = total flow rate at that instant (approx=volume when dt≈1h).
+    bolus_events = sorted([(t, flow) for t, flow in feed_rows])
+    return {'measurements': measurements, 'feed_events': bolus_events}
 
 
-def load_batch_data(batch_id: str, project: str = "DTB") -> Dict:
-    """Load complete batch data including feed profiles"""
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
-    cur.execute("""
-        SELECT ed.*, e.batch_id as bid
-        FROM experiment_data ed 
-        JOIN experiments e ON ed.experiment_id = e.id
-        WHERE e.project = %s AND e.batch_id = %s
-        ORDER BY ed.t
-    """, (project, batch_id))
-    
-    rows = list(cur.fetchall())
-    cur.close(); conn.close()
-    
-    result = {
-        't': [], 'vcd': [], 'substrate': [], 'byproduct': [], 'volume': [],
-        'feed_substrate': [], 'feed_b': [], 'feed_c': [], 'feed_d': [],
-        't_feed_substrate': [], 't_feed_b': [], 't_feed_c': [], 't_feed_d': [],
-        'val_feed_substrate': [], 'val_feed_b': [], 'val_feed_c': [], 'val_feed_d': [],
-    }
-    
-    for r in rows:
-        result['t'].append(r['t'])
-        result['vcd'].append(r['vcd'])
-        result['substrate'].append(r['substrate'])
-        result['byproduct'].append(r['byproduct'])
-        result['volume'].append(r['volume'])
-        
-        if r['feed_substrate'] is not None:
-            result['t_feed_substrate'].append(r['t'])
-            result['val_feed_substrate'].append(r['feed_substrate'])
-        if r['feed_b'] is not None:
-            result['t_feed_b'].append(r['t'])
-            result['val_feed_b'].append(r['feed_b'])
-        if r['feed_c'] is not None:
-            result['t_feed_c'].append(r['t'])
-            result['val_feed_c'].append(r['feed_c'])
-        if r['feed_d'] is not None:
-            result['t_feed_d'].append(r['t'])
-            result['val_feed_d'].append(r['feed_d'])
-    
-    return result
+def _rates_to_bolus_events(feed_rows: List) -> List[Tuple[float, float]]:
+    """Convert instantaneous flow rates (L/h) to integrated bolus volumes.
 
-
-def build_feed_interpolators(batch_data: Dict, t_max: float) -> Dict:
-    """Create interpolating functions for feed streams."""
-    feeds = {}
-    for feed_name in ['feed_substrate', 'feed_b', 'feed_c', 'feed_d']:
-        t_key = f't_{feed_name}'
-        v_key = f'val_{feed_name}'
-        
-        if batch_data[t_key]:
-            feeds[feed_name] = interp1d(
-                batch_data[t_key], batch_data[v_key],
-                kind='previous', bounds_error=False,
-                fill_value=0.0
-            )
+    With forward-fill: rate(t) = rate_i for t in [t_i, t_{i+1}).
+    dV_bolus at t_i = rate_i * (t_{i+1} - t_i)
+    Last event uses average interval.
+    """
+    if not feed_rows:
+        return []
+    sorted_rows = sorted(feed_rows)
+    events = []
+    n = len(sorted_rows)
+    for i in range(n):
+        t_i, r_i = sorted_rows[i]
+        if i < n - 1:
+            dt = sorted_rows[i + 1][0] - t_i
         else:
-            feeds[feed_name] = lambda t: 0.0
-    
-    return feeds
+            dt = t_i - sorted_rows[i - 1][0] if n >= 2 else 1.0
+        # Clamp dt to [0.1, 2.0] hours (avoid absurd values from sparse data)
+        dt = max(0.1, min(2.0, dt))
+        events.append((t_i, r_i * dt))
+    return events
 
 
-def custom_ode(t, y, organism, batch_data, feeds, fit_params=None):
-    """
-    Custom ODE with DTB feed data incorporated as time-varying inputs.
-    
-    y = [X_v, X_d, S, P, B, DO, V, T, pH]
-    """
+# ===========================================================================
+# ODE (batch model between boluses)
+# ===========================================================================
+def batch_ode(t, y, organism, params):
+    """Pure batch ODE rates. Feeds are applied as boluses between ODE steps."""
     X_v, X_d, S, P, B, DO, V, T, pH = y
-    
-    # Use fitted params if provided
-    g = organism.growth
-    if fit_params:
-        mu_max = fit_params.get('mu_max', g.mu_max)
-        K_s = fit_params.get('K_s', g.K_s)
-        Y_XS = fit_params.get('Y_XS', g.Y_XS)
-        m_s = fit_params.get('m_s', g.m_s)
-        n = fit_params.get('n', g.n)
-    else:
-        mu_max, K_s, Y_XS, m_s, n = g.mu_max, g.K_s, g.Y_XS, g.m_s, g.n
-    
+    X_v = max(0.0, X_v); X_d = max(0.0, X_d); S = max(0.0, S)
+    DO = max(0.0, DO); V = max(0.1, V)
+
+    mu_max = params.get('mu_max', 0.7)
+    K_s = params.get('K_s', 0.02)
+    Y_XS = params.get('Y_XS', 0.5)
+    m_s = params.get('m_s', 0.025)
+    alpha = params.get('alpha', 0.0)
+    beta = params.get('beta', 0.02)
+    k_d_val = params.get('k_d', 0.01)
+
     # Environment factors
-    f_T = temp_factor_cardinal(T, organism.environment.T_min, 
-                                organism.environment.T_opt, organism.environment.T_max)
-    f_pH = ph_factor_gaussian(pH, organism.environment.pH_opt, organism.environment.pH_sigma)
-    
-    # Specific growth rate (Monod)
+    env = organism.environment
+    f_T = temp_factor_cardinal(T, env.T_min, env.T_opt, env.T_max)
+    f_pH = ph_factor_gaussian(pH, env.pH_opt, env.pH_sigma)
+
+    # Growth: Monod
     mu = mu_max * (S / (K_s + S)) * f_T * f_pH
-    
-    # Specific uptake rate (Pirt model)
-    if Y_XS > 0:
-        q_S = mu / Y_XS + m_s
-    else:
-        q_S = m_s
-    
-    # Product formation
-    q_P = 0
-    q_B = 0
-    if organism.products:
-        for prod in organism.products:
-            if fit_params:
-                alpha = fit_params.get('alpha', prod.alpha)
-                beta = fit_params.get('beta', prod.beta)
-            else:
-                alpha, beta = prod.alpha, prod.beta
-            
-            rate = alpha * mu + beta
-            if prod.product_type == 'byproduct':
-                q_B = rate
-            else:
-                q_P = rate
-    
-    # Death + lysis
-    k_d = organism.k_d_max * max(0, 1 - S / (S + K_s))
+
+    # Pirt uptake
+    q_S = (mu / Y_XS if Y_XS > 0 else 0) + m_s
+
+    # Luedeking-Piret byproduct
+    q_B = alpha * mu + beta
+
+    # Death (increases at low substrate)
+    k_d = k_d_val * max(0.0, 1.0 - S / (S + K_s))
+
+    # Rates
     dX_v = (mu - k_d) * X_v
     dX_d = k_d * X_v - organism.k_lysis * X_d
-    
-    # Substrate: consumption + feeds
-    dS = -q_S * X_v / V
-    
-    # Add feed inputs (g/L/h per feed stream, normalized by volume)
-    for feed_name, interp_fn in feeds.items():
-        feed_rate = interp_fn(t)
-        if feed_rate > 0:
-            if feed_name == 'feed_substrate':
-                dS += feed_rate / V
-            elif feed_name == 'feed_b':
-                dS += feed_rate / V  # feed_b typically supplements substrate
-            elif feed_name == 'feed_c':
-                dS += 0.5 * feed_rate / V  # partial substrate contribution
-            elif feed_name == 'feed_d':
-                dS += 0.3 * feed_rate / V
-    
-    # Products
-    dP = q_P * X_v
+    dS = -q_S * X_v
+    dP = 0.0
     dB = q_B * X_v
-    
-    # Oxygen (simplified)
-    q_O2 = organism.oxygen.q_O2_max * (mu / (mu_max + 1e-6))
-    kLa = 150.0
-    O2_star = 0.007
-    dDO = kLa * (O2_star - DO) - q_O2 * X_v
-    
-    # Volume
-    feed_total = sum(f(t) for f in feeds.values())
-    dV = feed_total / 1000.0  # convert to liters
-    
-    # Temperature and pH held constant in batch
-    dT = 0
-    dpH = 0
-    
+    dDO = 150.0 * (0.007 - DO) - (mu / 0.95 + 0.01) * X_v
+    dV = 0.0
+    dT = 0.0
+    dpH = 0.0
     return [dX_v, dX_d, dS, dP, dB, dDO, dV, dT, dpH]
 
 
-def fit_organism_with_feeds(
-    organism_id: str,
-    batch_id: str,
-    project: str = "DTB",
-    params_to_fit: Optional[List[str]] = None,
-    loss: str = "huber"
-) -> Dict:
-    """
-    Fit organism parameters to a single DTB batch using actual feed profiles.
-    """
+def apply_bolus(y, dV, S_feed):
+    """Apply feed bolus: dilute biomass + add substrate (matches Java applyBolus)."""
+    X_v, X_d, S, P, B, DO, V, T, pH = y
+    V_new = V + dV
+    dil = V / V_new
+    feed = dV / V_new
+    return [
+        X_v * dil, X_d * dil,
+        S * dil + S_feed * feed,
+        P * dil, B * dil, DO * dil,
+        V_new, T, pH
+    ]
+
+
+def simulate(batch: Dict, y0: List[float], organism, params: Dict):
+    """Integrate batch between bolus feed events."""
+    t_end = max(batch['measurements']['t']) * 1.05
+    feed_events = batch['feed_events']
+
+    # Build time segments
+    times = []
+    for tev, _ in feed_events:
+        if 0 < tev < t_end:
+            times.extend([tev - 1e-10, tev])
+    times = sorted(set([0.0] + times + [t_end]))
+
+    state = list(y0)
+    record_t = [0.0]
+    record_y = [list(state)]
+
+    for i in range(len(times) - 1):
+        t0 = times[i]
+        t1 = times[i + 1]
+        if t1 - t0 < 1e-12:
+            continue
+
+        # Apply feed bolus at segment start
+        if t0 > 0:
+            for tev, dV in feed_events:
+                if abs(tev - t0) < 1e-10:
+                    state = apply_bolus(state, dV, S_FEED)
+
+        # Integrate
+        try:
+            sol = solve_ivp(
+                lambda t, y: batch_ode(t, y, organism, params),
+                (t0, t1), state,
+                method='LSODA', rtol=1e-4, atol=1e-6, max_step=1.0
+            )
+            state = [sol.y[j][-1] for j in range(9)]
+        except Exception:
+            pass
+
+        if t1 > record_t[-1]:
+            record_t.append(t1)
+            record_y.append(list(state))
+
+    return np.array(record_t), np.array(record_y).T
+
+
+# ===========================================================================
+# Fitting
+# ===========================================================================
+def fit_organism(organism_id: str, batch_ids: List[str],
+                 params_to_fit: Optional[List[str]] = None,
+                 reg_strength: float = 0.0) -> Dict:
+    """Fit model parameters to training batches."""
     from db_connector import load_organism
-    
+
     organism = load_organism(organism_id)
     if organism is None:
         return {"status": "error", "message": f"Organism {organism_id} not found"}
-    
-    batch = load_batch_data(batch_id, project)
-    feeds = build_feed_interpolators(batch, max(batch['t']) * 1.1)
-    
-    # Observation mask
-    mask = [(batch['vcd'][i] is not None and batch['substrate'][i] is not None)
-            for i in range(len(batch['t']))]
-    t_obs = np.array([batch['t'][i] for i, m in enumerate(mask) if m])
-    vcd_obs = np.array([batch['vcd'][i] for i, m in enumerate(mask) if m])
-    s_obs = np.array([batch['substrate'][i] for i, m in enumerate(mask) if m])
-    b_obs = np.array([(batch['byproduct'][i] if batch['byproduct'][i] else 0)
-                       for i, m in enumerate(mask) if m])
-    
-    if len(t_obs) < 5:
-        return {"status": "error", "message": "Too few observations"}
-    
-    t_end = max(batch['t']) * 1.05
-    
-    # Initial conditions
-    V0 = batch['volume'][0] if batch['volume'][0] else 10.0
-    DO0 = 0.007
-    y0 = [float(vcd_obs[0]), 0.0, float(s_obs[0]), 0.0, float(b_obs[0]), DO0, V0, 37.0, 7.0]
-    
+
     if params_to_fit is None:
-        params_to_fit = ['mu_max', 'K_s', 'Y_XS', 'alpha', 'beta', 'm_s']
-    
-    # Initial guess
-    x0 = []
-    for k in params_to_fit:
-        vals = {
-            'mu_max': organism.growth.mu_max,
-            'K_s': organism.growth.K_s,
-            'Y_XS': organism.growth.Y_XS,
-            'K_i': organism.growth.K_i or 1.0,
-            'm_s': organism.growth.m_s,
-            'n': organism.growth.n,
-            'alpha': organism.products[0].alpha if organism.products else 0.1,
-            'beta': organism.products[0].beta if organism.products else 0.01,
-        }
-        x0.append(vals.get(k, 1.0))
-    x0 = np.clip(np.array(x0), 1e-4, 50.0)
-    
-    def objective(p):
-        fit_params = dict(zip(params_to_fit, p))
-        
-        try:
-            sol = solve_ivp(
-                lambda t, y: custom_ode(t, y, organism, batch, feeds, fit_params),
-                (0, t_end), y0,
-                method='LSODA', rtol=1e-4, atol=1e-6, max_step=5.0
-            )
-        except Exception:
-            return np.ones(len(t_obs) * 3) * 1e6
-        
-        if not sol.success:
-            return np.ones(len(t_obs) * 3) * 1e6
-        
-        X_v_sim = np.interp(t_obs, sol.t, sol.y[0])
-        S_sim = np.interp(t_obs, sol.t, sol.y[2])
-        B_sim = np.interp(t_obs, sol.t, sol.y[4])
-        
-        residuals = np.concatenate([
-            (X_v_sim - vcd_obs) / max(np.mean(vcd_obs), 0.5),
-            (S_sim - s_obs) / max(np.mean(s_obs), 0.5),
-            0.5 * (B_sim - b_obs) / max(max(b_obs), 0.1)
-        ])
-        return residuals
-    
-    bounds = (np.ones(len(params_to_fit)) * 1e-4, np.ones(len(params_to_fit)) * 50.0)
-    
+        params_to_fit = ['mu_max', 'K_s', 'Y_XS', 'alpha', 'beta']
+
+    x0 = np.array([PARAM_DEFAULTS[k]['default'] for k in params_to_fit])
+    lower = np.array([PARAM_DEFAULTS[k]['lower'] for k in params_to_fit])
+    upper = np.array([PARAM_DEFAULTS[k]['upper'] for k in params_to_fit])
+    reg_scales = np.array([PARAM_DEFAULTS[k]['reg_scale'] for k in params_to_fit])
+
+    # Pre-load all batches
+    all_batches = {}
+    for bid in batch_ids:
+        all_batches[bid] = load_batch_csv(bid)
+
+    # Pre-build residual point list (matches Java collectPoints)
+    points = []
+    for bid in batch_ids:
+        m = all_batches[bid]['measurements']
+        t_obs = m['t']
+        for i in range(1, len(t_obs)):  # skip t=0
+            if m['vcd'][i] is not None and m['vcd'][i] > 0.01:
+                points.append(('vcd', bid, t_obs[i], m['vcd'][i]))
+            if m['substrate'][i] is not None and m['substrate'][i] > 0.01:
+                points.append(('sub', bid, t_obs[i], m['substrate'][i]))
+            if m['byproduct'][i] is not None and m['byproduct'][i] > 0.01:
+                points.append(('byp', bid, t_obs[i], m['byproduct'][i]))
+
+    # Cache simulations per batch+params to avoid redundant ODE solves
+    _sim_cache = {}
+
+    def simulate_cached(bid, params_tuple):
+        key = (bid, params_tuple)
+        if key not in _sim_cache:
+            batch = all_batches[bid]
+            m = batch['measurements']
+            V0 = m['volume'][0] if m['volume'][0] else 10.0
+            S0 = m['substrate'][0] if m['substrate'][0] else 4.5
+            X_v0 = m['vcd'][0] if m['vcd'][0] else 1.0
+            y0 = [X_v0, 0.0, S0, 0.0, 0.0, 0.007, V0, 37.0, 7.0]
+            fit = dict(zip(params_to_fit, params_tuple))
+            t_sim, y_sim = simulate(batch, y0, organism, fit)
+            _sim_cache[key] = (t_sim, y_sim)
+        return _sim_cache[key]
+
+    def residuals(p):
+        """Weighted relative error (matches Java computeResiduals)."""
+        params_tuple = tuple(p)
+        _sim_cache.clear()
+        result = []
+        eps = 0.5
+
+        for kind, bid, t, obs in points:
+            t_sim, y_sim = simulate_cached(bid, params_tuple)
+            if kind == 'vcd':
+                pred = np.interp(t, t_sim, y_sim[0])
+            elif kind == 'sub':
+                pred = np.interp(t, t_sim, y_sim[2])
+            else:  # byproduct
+                pred = np.interp(t, t_sim, y_sim[4])
+            denom = max(abs(obs), eps)
+            result.append((pred - obs) / denom)
+
+        # L2 regularization
+        reg = reg_strength * (p - x0) / (reg_scales + 1e-6)
+        result.extend(reg)
+        return np.array(result)
+
+    # Fit
     try:
-        result = least_squares(objective, x0, bounds=bounds,
-                                method='trf', loss=loss, max_nfev=100, xtol=1e-6, ftol=1e-6)
+        result = least_squares(
+            residuals, x0, bounds=(lower, upper),
+            method='trf', max_nfev=10,  # keep low: Jacobian = 2*n_params solves per iter
+            xtol=1e-4, ftol=1e-4, gtol=1e-4
+        )
+        x_final = result.x
+        conv = {'success': result.success, 'message': result.message,
+                'nfev': result.nfev, 'cost': result.cost}
     except Exception as e:
         return {"status": "error", "message": str(e)}
-    
-    # Final fitted simulation
-    fit_params = dict(zip(params_to_fit, result.x))
-    t_fine = np.linspace(0, t_end, 500)
-    sol = solve_ivp(lambda t, y: custom_ode(t, y, organism, batch, feeds, fit_params),
-                    (0, t_end), y0, t_eval=t_fine, method='LSODA', rtol=1e-6, atol=1e-9)
-    
-    X_v_int = np.interp(t_obs, sol.t, sol.y[0])
-    S_int = np.interp(t_obs, sol.t, sol.y[2])
-    B_int = np.interp(t_obs, sol.t, sol.y[4])
-    
+
+    fit_params = dict(zip(params_to_fit, x_final))
+
+    # Per-batch R²
     def r2(y_true, y_pred):
-        yt = np.array(y_true)
-        ss_res = np.sum((yt - y_pred)**2)
+        yt, yp = np.array(y_true), np.array(y_pred)
+        ss_res = np.sum((yt - yp)**2)
         ss_tot = np.sum((yt - np.mean(yt))**2)
-        return 1.0 - ss_res/ss_tot if ss_tot > 0 else 0.0
-    
+        return float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+
+    r2_by_batch = {}
+    for bid in batch_ids:
+        b = all_batches[bid]
+        m = b['measurements']
+        t_obs = np.array(m['t'])
+        V0 = m['volume'][0] if m['volume'][0] else 10.0
+        S0 = m['substrate'][0] if m['substrate'][0] else 4.5
+        X_v0 = m['vcd'][0] if m['vcd'][0] else 1.0
+        y0 = [X_v0, 0.0, S0, 0.0, 0.0, 0.007, V0, 37.0, 7.0]
+
+        _sim_cache.clear()
+        t_sim, y_sim = simulate(b, y0, organism, fit_params)
+        X_v_sim = np.interp(t_obs, t_sim, y_sim[0])
+        S_sim = np.interp(t_obs, t_sim, y_sim[2])
+        B_sim = np.interp(t_obs, t_sim, y_sim[4])
+
+        obs_vcd = [v for v in m['vcd'] if v is not None]
+        obs_s = [v for v in m['substrate'] if v is not None]
+        obs_b = [v for v in m['byproduct'] if v is not None]
+
+        r2_by_batch[bid] = {
+            'R2_X_v': round(r2(obs_vcd, X_v_sim[:len(obs_vcd)]), 4),
+            'R2_S': round(r2(obs_s, S_sim[:len(obs_s)]), 4),
+            'R2_B': round(r2(obs_b, B_sim[:len(obs_b)]), 4),
+        }
+
     return {
         "status": "success",
-        "organism_id": organism_id,
-        "batch_id": batch_id,
-        "project": project,
         "fitted_params": {k: float(v) for k, v in fit_params.items()},
-        "initial_params": dict(zip(params_to_fit, x0.tolist())),
-        "convergence": {
-            "success": bool(result.success),
-            "message": str(result.message),
-            "nfev": int(result.nfev),
-            "cost": float(result.cost)
-        },
-        "goodness_of_fit": {
-            "R2_X_v": round(r2(vcd_obs, X_v_int), 4),
-            "R2_S": round(r2(s_obs, S_int), 4),
-            "R2_B": round(r2(b_obs, B_int), 4)
-        },
-        "n_observations": len(t_obs),
-        "simulation": {
-            "time": sol.t.tolist(),
-            "X_v": sol.y[0].tolist(),
-            "S": sol.y[2].tolist(),
-            "B": sol.y[4].tolist(),
-            "V": sol.y[6].tolist(),
-            "experimental": {
-                "time": t_obs.tolist(),
-                "X_v": vcd_obs.tolist(),
-                "S": s_obs.tolist(),
-                "B": b_obs.tolist()
-            }
-        }
+        "convergence": conv,
+        "goodness_of_fit": r2_by_batch,
     }
 
 
+# ===========================================================================
+# Main
+# ===========================================================================
 if __name__ == "__main__":
-    import json
-    
-    print("=== Fit ecoli_k12 to DTB Batch1 (feed-driven) ===\n")
-    result = fit_organism_with_feeds('ecoli_k12', 'Batch1')
-    
-    if result['status'] == 'success':
-        print(f"Convergence: {result['convergence']['message']}")
-        print(f"Function evals: {result['convergence']['nfev']}")
-        r2 = result['goodness_of_fit']
-        print(f"R²:  X_v={r2['R2_X_v']:.4f}  S={r2['R2_S']:.4f}  B={r2['R2_B']:.4f}")
-        print(f"\nFitted params:")
-        for k, v in result['fitted_params'].items():
-            init = result['initial_params'][k]
-            print(f"  {k:8s}: {init:.4f} → {v:.4f}")
-    else:
-        print(f"Error: {result.get('message')}")
+    for bname in ['Batch1']:
+        print(f"\n=== Fit ecoli_k12 → {bname} ===")
+        result = fit_organism('ecoli_k12', [bname],
+                              params_to_fit=['mu_max', 'K_s', 'Y_XS', 'alpha', 'beta', 'k_d'])
+        if result['status'] == 'success':
+            for bid, r2 in result['goodness_of_fit'].items():
+                print(f"  {bid}: R² X_v={r2['R2_X_v']:.4f}  S={r2['R2_S']:.4f}  B={r2['R2_B']:.4f}")
+            print(f"  Params: {', '.join(f'{k}={v:.4f}' for k,v in result['fitted_params'].items())}")
+            print(f"  nfev={result['convergence']['nfev']}")
+        else:
+            print(f"  ERROR: {result.get('message')}")

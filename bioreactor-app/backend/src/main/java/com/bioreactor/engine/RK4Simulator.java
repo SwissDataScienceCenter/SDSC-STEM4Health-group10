@@ -1,0 +1,149 @@
+package com.bioreactor.engine;
+
+import java.util.*;
+
+/**
+ * Fixed-step Runge-Kutta 4 simulator — much faster than adaptive Dormand-Prince
+ * for fitting on many batches with many events.
+ *
+ * Uses dt=0.01 as the team's Python does. Events are applied at grid boundaries
+ * (timing error ≤ dt). Between events, volume is constant.
+ */
+public class RK4Simulator {
+
+    private final ProcessModel model;
+    private final double dt;  // fixed step size
+
+    public RK4Simulator(ProcessModel model, double dt) {
+        this.model = model;
+        this.dt = dt;
+    }
+
+    public RK4Simulator(ProcessModel model) {
+        this(model, 0.01);
+    }
+
+    public record SimResult(List<Double> times, List<BioreactorState> states) {}
+
+    /**
+     * Simulate using fixed-step RK4, applying events at grid boundaries.
+     */
+    public SimResult simulate(
+        BioreactorState initialState, Map<String, Double> params,
+        List<Simulator.Event> events, double tEnd
+    ) {
+        int nSteps = (int) Math.ceil(tEnd / dt) + 2;
+        List<Simulator.Event> sorted = new ArrayList<>(events);
+        sorted.sort(Comparator.comparingDouble(Simulator.Event::time));
+
+        // Build event index: for each step k, list of events with time in (k*dt, (k+1)*dt]
+        @SuppressWarnings("unchecked")
+        List<Simulator.Event>[] stepEvents = new List[nSteps];
+        for (int i = 0; i < nSteps; i++) stepEvents[i] = new ArrayList<>();
+        for (var ev : sorted) {
+            int k = Math.max(0, (int) Math.ceil(ev.time() / dt) - 1);
+            if (k < nSteps) stepEvents[k].add(ev);
+        }
+
+        double[] x = initialState.stateVector();
+        double V = initialState.volume();
+
+        // Dense output at dt resolution
+        List<Double> times = new ArrayList<>();
+        List<BioreactorState> states = new ArrayList<>();
+        times.add(0.0);
+        states.add(newState(0.0, x, V, initialState.temperature(), initialState.pH()));
+
+        for (int k = 0; k < nSteps; k++) {
+            double t = k * dt;
+
+            // Apply events at the end of step k
+            for (var ev : stepEvents[k]) {
+                switch (ev.type()) {
+                    case FEED_BOLUS -> {
+                        Map<String, Double> conc = ev.feedConcentrations();
+                        if (conc == null && ev.feedName() != null) {
+                            conc = model.feedStreamConcentrations(ev.feedName(), params);
+                        }
+                        if (conc != null && !conc.isEmpty()) {
+                            double C_feed = conc.getOrDefault("substrate", 0.0);
+                            double Vnew = V + ev.dV();
+                            // Mass balance: x_new = (x*V + feed_conc*dV) / Vnew
+                            // Concentrations: cells don't enter with feed
+                            x[0] = x[0] * V / Vnew;  // Xv diluted
+                            x[1] = x[1] * V / Vnew;  // Xd diluted
+                            x[2] = (x[2] * V + C_feed * ev.dV()) / Vnew;  // S
+                            x[3] = x[3] * V / Vnew;  // P diluted
+                            x[4] = x[4] * V / Vnew;  // B diluted
+                            V = Vnew;
+                        }
+                    }
+                    case SAMPLE_VOLUME -> {
+                        if (ev.measuredVolume() != null) V = ev.measuredVolume();
+                    }
+                }
+            }
+
+            // RK4 step
+            if (k < nSteps - 1) {
+                double[] k1 = model.rates(newState(t, x, V, initialState.temperature(), initialState.pH()), params);
+                double[] x2 = add(x, scale(k1, 0.5 * dt));
+                double[] k2 = model.rates(newState(t + 0.5 * dt, x2, V, initialState.temperature(), initialState.pH()), params);
+                double[] x3 = add(x, scale(k2, 0.5 * dt));
+                double[] k3 = model.rates(newState(t + 0.5 * dt, x3, V, initialState.temperature(), initialState.pH()), params);
+                double[] x4 = add(x, scale(k3, dt));
+                double[] k4 = model.rates(newState(t + dt, x4, V, initialState.temperature(), initialState.pH()), params);
+
+                for (int i = 0; i < x.length; i++) {
+                    x[i] = x[i] + dt / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+                    if (x[i] < 0 && i >= 2 && i <= 4) x[i] = 0;  // clip concentrations
+                }
+            }
+
+            if ((k + 1) * dt <= tEnd) {
+                times.add((k + 1) * dt);
+                states.add(newState((k + 1) * dt, x, V, initialState.temperature(), initialState.pH()));
+            }
+        }
+
+        return new SimResult(times, states);
+    }
+
+    /** Convert arrays to BioreactorState. */
+    public BioreactorState stateAt(List<Double> times, List<BioreactorState> states, double t) {
+        int idx = 0;
+        for (int i = 0; i < times.size(); i++) {
+            if (times.get(i) >= t) { idx = i; break; }
+            idx = i;
+        }
+        if (idx >= times.size() - 1) return states.getLast();
+
+        double t0 = times.get(idx), t1 = times.get(idx + 1);
+        if (t1 - t0 < 1e-10) return states.get(idx);
+        double frac = (t - t0) / (t1 - t0);
+        BioreactorState s0 = states.get(idx), s1 = states.get(idx + 1);
+        return new BioreactorState(t,
+            s0.xv() + frac * (s1.xv() - s0.xv()),
+            s0.xd() + frac * (s1.xd() - s0.xd()),
+            s0.substrate() + frac * (s1.substrate() - s0.substrate()),
+            s0.product() + frac * (s1.product() - s0.product()),
+            s0.byproduct() + frac * (s1.byproduct() - s0.byproduct()),
+            s0.dissolvedO2(), s0.volume(), s0.temperature(), s0.pH());
+    }
+
+    private static BioreactorState newState(double t, double[] x, double V, double T, double pH) {
+        return new BioreactorState(t, x[0], x[1], x[2], x[3], x[4], x[5], V, T, pH);
+    }
+
+    private static double[] add(double[] a, double[] b) {
+        double[] r = new double[a.length];
+        for (int i = 0; i < a.length; i++) r[i] = a[i] + b[i];
+        return r;
+    }
+
+    private static double[] scale(double[] a, double s) {
+        double[] r = new double[a.length];
+        for (int i = 0; i < a.length; i++) r[i] = a[i] * s;
+        return r;
+    }
+}

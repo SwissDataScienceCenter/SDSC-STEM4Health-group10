@@ -44,7 +44,7 @@ public class DTBDataReader {
      */
     public DTBBatch loadBatch(String batchId) throws SQLException {
         String sql = """
-            SELECT ed.t, ed.vcd, ed.substrate, ed.byproduct, ed.volume,
+            SELECT ed.t, ed.vcd, ed.tcd, ed.substrate, ed.byproduct, ed.volume,
                    ed.feed_b, ed.feed_c, ed.feed_d, ed.to_predict
             FROM experiment_data ed
             JOIN experiments e ON ed.experiment_id = e.id
@@ -54,6 +54,7 @@ public class DTBDataReader {
 
         List<Double> tAll = new ArrayList<>();
         List<Double> vcdVals = new ArrayList<>();
+        List<Double> tcdVals = new ArrayList<>();
         List<Double> subVals = new ArrayList<>();
         List<Double> bypVals = new ArrayList<>();
         List<Double> volVals = new ArrayList<>();
@@ -73,8 +74,10 @@ public class DTBDataReader {
                 while (rs.next()) {
                     double t = rs.getDouble("t");
                     double vcd = rs.getDouble("vcd");
-                    double vol = rs.getDouble("volume");
                     boolean hasVcd = !rs.wasNull();
+                    double tcd = rs.getDouble("tcd");
+                    boolean hasTcd = !rs.wasNull();
+                    double vol = rs.getDouble("volume");
                     double sub = rs.getDouble("substrate");
                     boolean hasSub = !rs.wasNull();
                     double byp = rs.getDouble("byproduct");
@@ -94,6 +97,7 @@ public class DTBDataReader {
                     if (hasVcd) {
                         measTimes.add(t);
                         vcdVals.add(vcd);
+                        tcdVals.add(hasTcd ? tcd : Double.NaN);
                         subVals.add(hasSub ? sub : Double.NaN);
                         bypVals.add(hasByp ? byp : Double.NaN);
                         volVals.add(vol);
@@ -107,23 +111,22 @@ public class DTBDataReader {
         }
 
         // Build events from feed rows (feed volumes are already in L)
-        // Feed B is the main substrate feed
+        // Feed names are used so the model resolves concentrations dynamically
         List<Simulator.Event> events = new ArrayList<>();
         for (int i = 0; i < feedBTimes.size(); i++) {
             double t = feedBTimes.get(i);
-            double dV = feedBVals.get(i); // L
-            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 500.0)));
+            double dV = feedBVals.get(i);
+            if (dV > 0.01) events.add(Simulator.Event.feedBolus(t, dV, "feed_b"));
         }
-        // Feed C and D are minor feeds (could be inducer/alkali)
         for (int i = 0; i < feedCTimes.size(); i++) {
             double t = feedCTimes.get(i);
-            double dV = feedCVals.get(i); // L
-            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 0.0)));
+            double dV = feedCVals.get(i);
+            if (dV > 0.01) events.add(Simulator.Event.feedBolus(t, dV, "feed_c"));
         }
         for (int i = 0; i < feedDTimes.size(); i++) {
             double t = feedDTimes.get(i);
-            double dV = feedDVals.get(i); // L
-            events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 0.0)));
+            double dV = feedDVals.get(i);
+            if (dV > 0.01) events.add(Simulator.Event.feedBolus(t, dV, "feed_d"));
         }
 
         // Sampling events: set volume to measured volume (skip t=0, it's initial)
@@ -147,11 +150,11 @@ public class DTBDataReader {
             0, vcd0, 0, sub0, 0, byp0, 0.007, vol0, 37.0, 7.0
         );
 
-        Map<String, List<Double>> measurements = Map.of(
-            "vcd", vcdVals,
-            "substrate", subVals,
-            "byproduct", bypVals
-        );
+        Map<String, List<Double>> measurements = new HashMap<>();
+        measurements.put("vcd", vcdVals);
+        measurements.put("tcd", tcdVals);
+        measurements.put("substrate", subVals);
+        measurements.put("byproduct", bypVals);
 
         return new DTBBatch(batchId, ic, events, measTimes, measurements, isTest);
     }
