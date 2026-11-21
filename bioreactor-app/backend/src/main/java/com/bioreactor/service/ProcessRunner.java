@@ -310,6 +310,56 @@ public class ProcessRunner {
         return metrics;
     }
 
+    // ── Prediction: forward trajectory ──
+
+    public PredictionResult predictRun(String runId, String organismId,
+                                        List<Double> targetTimes, double tEnd) {
+        var config = configLoader.load(organismId);
+        var model = new ConfigurableModel(config);
+        Map<String, Double> params = new HashMap<>();
+        for (var mp : model.parameters()) params.put(mp.name(), mp.startValue());
+
+        var readings = loadReadings(runId);
+        if (readings.isEmpty()) {
+            return new PredictionResult(runId, organismId, "NO_DATA",
+                "No readings for initial conditions", List.of());
+        }
+        var first = readings.get(0);
+        BioreactorState s0 = new BioreactorState(0.0,
+            first.get("vcd", 0.5), 0.0, first.get("substrate", 10.0),
+            0.0, 0.0, 0.007, first.get("volume", 1.0),
+            config.tOpt(), config.pHOpt());
+
+        var feedEvents = loadFeedEvents(runId);
+        List<Simulator.Event> events = new ArrayList<>();
+        for (var fe : feedEvents)
+            if (fe.amount > 0.01)
+                events.add(Simulator.Event.feedBolus(fe.time, fe.amount, fe.materialCode));
+
+        var sim = new RK4Simulator(model, 0.01);
+        var result = sim.simulate(s0, params, events, tEnd);
+        if (targetTimes == null || targetTimes.isEmpty())
+            targetTimes = result.times();
+
+        double band = 0.30;
+        var points = new ArrayList<PredictionPoint>();
+        for (double t : targetTimes) {
+            var s = interpolate(result, t);
+            if (s == null) continue;
+            points.add(p(t, "vcd", s.xv(), band));
+            points.add(p(t, "tcd", s.xv() + s.xd(), band));
+            points.add(p(t, "substrate", Math.max(0, s.substrate()), band));
+            points.add(p(t, "byproduct", Math.max(0, s.byproduct()), band));
+        }
+        return new PredictionResult(runId, organismId, "OK",
+            String.format("Predicted %d points over %.1f days", points.size(), tEnd), points);
+    }
+
+    private PredictionPoint p(double t, String code, double val, double band) {
+        double m = band * Math.max(Math.abs(val), 0.01);
+        return new PredictionPoint(t, code, val, Math.max(0, val - m), val + m);
+    }
+
     // ── Trending: control charts across batches ──
 
     /**
@@ -385,4 +435,11 @@ public class ProcessRunner {
     public record TrendReport(String parameterCode, double mean, double sigma,
                               double ucl, double lcl, double cpk,
                               List<Double> values, List<String> violations) {}
+
+    public record PredictionPoint(double time, String parameterCode, double value,
+                                   double lower, double upper) {}
+
+    public record PredictionResult(String runId, String organismId, String status,
+                                    String message,
+                                    List<PredictionPoint> predictions) {}
 }
