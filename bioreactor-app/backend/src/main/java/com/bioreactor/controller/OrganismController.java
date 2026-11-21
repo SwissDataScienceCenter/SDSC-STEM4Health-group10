@@ -85,21 +85,18 @@ public class OrganismController {
             params.putAll(req.parameterOverrides);
         }
 
-        // Initial state
-        int dim = BioreactorState.CORE_STATE_SIZE + model.hiddenStateCount();
-        double[] initialState = new double[dim];
-        initialState[0] = req.initialXv > 0 ? req.initialXv : 0.5;  // Xv
-        initialState[2] = req.initialSubstrate > 0 ? req.initialSubstrate : 10.0; // S0
-        // DO
-        int idxDO = 2 + config.substrates().size() + config.products().size() + config.byproducts().size();
-        initialState[idxDO] = 0.007; // saturation
-        // Temperature & pH
-        initialState[idxDO + 2] = req.temperature > 0 ? req.temperature : config.tOpt();
-        initialState[idxDO + 3] = req.pHValue > 0 ? req.pHValue : config.pHOpt();
-
-        BioreactorState init = new BioreactorState(0.0, initialState[0], initialState[1],
-            initialState[2], 0.0, 0.0, initialState[idxDO], req.volume > 0 ? req.volume : 1.0,
-            initialState[idxDO + 2], initialState[idxDO + 3]);
+        // Initial state using standard 9-field BioreactorState layout
+        BioreactorState init = new BioreactorState(
+            0.0,  // time
+            req.initialXv > 0 ? req.initialXv : 0.5,       // Xv
+            0.0,                                            // Xd
+            req.initialSubstrate > 0 ? req.initialSubstrate : 10.0, // S
+            0.0,                                            // P
+            0.0,                                            // B
+            0.007,                                          // DO
+            req.volume > 0 ? req.volume : 1.0,               // V
+            req.temperature > 0 ? req.temperature : config.tOpt(),  // T
+            req.pHValue > 0 ? req.pHValue : config.pHOpt());         // pH
 
         // Run simulation
         RK4Simulator sim = new RK4Simulator(model, 0.01);

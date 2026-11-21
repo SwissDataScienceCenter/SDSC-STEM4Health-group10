@@ -23,6 +23,7 @@ public class OrganismConfigLoader {
 
     /** Load a single organism by ID. */
     public OrganismConfig load(String organismId) {
+        if (organismId == null) throw new IllegalArgumentException("organismId must not be null");
         // ── organism row ──
         Map<String, Object> org = jdbc.queryForMap(
             "SELECT id, name, organism_type, gram_stain, description, genome_model FROM organisms WHERE id = ?",
