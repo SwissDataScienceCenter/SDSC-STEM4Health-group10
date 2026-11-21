@@ -19,14 +19,20 @@ public class Simulator {
     }
 
     public record Event(double time, EventType type, double dV,
+                        String feedName,
                         Map<String, Double> feedConcentrations,
                         Double measuredVolume) {
         public enum EventType { FEED_BOLUS, SAMPLE_VOLUME }
+        /** Create a feed bolus event. feedName identifies the feed stream (e.g. "feed_b", "substrate"). */
+        public static Event feedBolus(double t, double dV, String feedName) {
+            return new Event(t, EventType.FEED_BOLUS, dV, feedName, null, null);
+        }
+        /** Backward-compatible: feed with explicit concentrations. */
         public static Event feedBolus(double t, double dV, Map<String, Double> c) {
-            return new Event(t, EventType.FEED_BOLUS, dV, c, null);
+            return new Event(t, EventType.FEED_BOLUS, dV, null, c, null);
         }
         public static Event sampleVolume(double t, double V) {
-            return new Event(t, EventType.SAMPLE_VOLUME, 0, Map.of(), V);
+            return new Event(t, EventType.SAMPLE_VOLUME, 0, null, Map.of(), V);
         }
     }
 
@@ -57,9 +63,16 @@ public class Simulator {
             while (eventIdx < sorted.size() && sorted.get(eventIdx).time() <= t + 1e-10) {
                 Event ev = sorted.get(eventIdx);
                 switch (ev.type()) {
-                    case FEED_BOLUS:
-                        current = current.applyBolus(ev.dV(), ev.feedConcentrations());
+                    case FEED_BOLUS: {
+                        Map<String, Double> conc = ev.feedConcentrations();
+                        if (conc == null && ev.feedName() != null) {
+                            // Look up from model: the model knows what each feed carries
+                            conc = model.feedStreamConcentrations(ev.feedName(), params);
+                        }
+                        if (conc == null) conc = Map.of();
+                        current = current.applyBolus(ev.dV(), conc);
                         break;
+                    }
                     case SAMPLE_VOLUME:
                         if (ev.measuredVolume() != null)
                             current = current.withVolume(ev.measuredVolume());

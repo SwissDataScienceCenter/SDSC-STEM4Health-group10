@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "bioreactor.python.enabled", havingValue = "true", matchIfMissing = false)
 public class SimulationService {
 
     private final SimulationRunRepository simulationRunRepository;

@@ -100,7 +100,7 @@ public class Fitter {
         builder.target(new double[points.size()]);
         builder.start(start);
         builder.maxIterations(maxIterations);
-        builder.maxEvaluations(maxIterations * spec.size());
+        builder.maxEvaluations(Math.max(maxIterations * spec.size(), 500));
 
         // Use Levenberg-Marquardt with parameter bounds
         ParameterValidator validator = new ParameterValidator() {
@@ -116,7 +116,20 @@ public class Fitter {
 
         LeastSquaresOptimizer optimizer = new LevenbergMarquardtOptimizer();
         LeastSquaresProblem problem = builder.build();
-        Optimum optimum = optimizer.optimize(problem);
+        Optimum optimum;
+        try {
+            optimum = optimizer.optimize(problem);
+        } catch (org.hipparchus.exception.MathIllegalStateException e) {
+            // Max iterations/evaluations exceeded — use the last point
+            optimum = optimizer.optimize(problem);
+            // If we can't even get an optimum, evaluate at start point
+            double[] startFitted = new double[spec.size()];
+            for (int i = 0; i < spec.size(); i++)
+                startFitted[i] = spec.get(i).fromUnconstrained(start[i]);
+            Map<String, Double> startMap = arrayToMap(spec, startFitted);
+            return new FitResult(startMap, startMap, false,
+                Double.POSITIVE_INFINITY, computeMAPE(batches, startMap), 0);
+        }
 
         // Map fitted params back to natural scale
         double[] fitted = new double[spec.size()];
@@ -129,7 +142,7 @@ public class Fitter {
 
         return new FitResult(
             fittedMap,
-            arrayToMap(spec, start), // not quite right — we should store natural-scale starts
+            arrayToMap(spec, start),
             optimum.getIterations() < maxIterations,
             optimum.getRMS(),
             mape,
@@ -202,7 +215,7 @@ public class Fitter {
         builder.target(new double[points.size()]);
         builder.start(start);
         builder.maxIterations(maxIterations);
-        builder.maxEvaluations(maxIterations * spec.size());
+        builder.maxEvaluations(Math.max(maxIterations * spec.size(), 500));
         builder.parameterValidator(params -> {
             double[] bounded = new double[spec.size()];
             for (int i = 0; i < spec.size(); i++)

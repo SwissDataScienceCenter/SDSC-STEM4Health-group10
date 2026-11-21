@@ -9,6 +9,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnBean(name = "simulationService")
 public class BioreactorController {
 
     private final SimulationService simulationService;
