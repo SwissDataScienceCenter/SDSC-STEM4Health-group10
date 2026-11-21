@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * REST API for manufacturing process monitoring and analysis.
@@ -69,5 +70,21 @@ public class ProcessController {
         @RequestParam(defaultValue = "peak_vcd") String parameter) {
         TrendReport report = runner.trendAnalysis(processId, parameter);
         return ResponseEntity.ok(report);
+    }
+
+    /** Predict future trajectory from initial conditions + feed schedule. */
+    @PostMapping("/runs/{runId}/predict")
+    public ResponseEntity<PredictionResult> predictRun(
+        @PathVariable String runId,
+        @RequestBody Map<String, Object> body) {
+        String organismId = body.getOrDefault("organism_id", "ecoli_k12").toString();
+        @SuppressWarnings("unchecked")
+        List<Number> rawTimes = (List<Number>) body.get("target_times");
+        List<Double> targetTimes = rawTimes != null
+            ? rawTimes.stream().map(Number::doubleValue).collect(Collectors.toList())
+            : List.of();
+        double tEnd = body.containsKey("t_end")
+            ? ((Number) body.get("t_end")).doubleValue() : 20.0;
+        return ResponseEntity.ok(runner.predictRun(runId, organismId, targetTimes, tEnd));
     }
 }

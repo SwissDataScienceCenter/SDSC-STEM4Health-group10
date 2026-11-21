@@ -20,6 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <hipparchus.version>3.1</hipparchus.version>
+        <vaadin.version>24.5.5</vaadin.version>
     </properties>
     
     <dependencies>
@@ -104,8 +105,27 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Vaadin Flow for manufacturing dashboard -->
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-spring-boot-starter</artifactId>
+            <version>${vaadin.version}</version>
+        </dependency>
     </dependencies>
-    
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.vaadin</groupId>
+                <artifactId>vaadin-bom</artifactId>
+                <version>${vaadin.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <build>
         <plugins>
             <plugin>
