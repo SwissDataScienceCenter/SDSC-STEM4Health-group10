@@ -29,10 +29,22 @@ CONFIG = {
         "substrate": REF,
         "byproduct": REF,
     },
+    # v2 (simpler, preferred): plain 50/50 geometric mean for both cell densities = what every nested run converged to
+    # (ens_k025+nearestK, ens_k025+nearestK2, ens_full all refit to exactly 0.5 / 0.5 on vcd and tcd).
+    "overnight_v2": {
+        "vcd": {"ridge_s_k025": 0.5, "nearest": 0.5},
+        "tcd": {"ridge_s_k025": 0.5, "nearest": 0.5},
+        "substrate": REF,
+        "byproduct": REF,
+    },
 }
 # per target: which saved OOF gives the honest (nested) LOBO estimate of that target's predictions
 HONEST_OOF = {
     "overnight_v1": {"vcd": "ens_ridge_s+ridge_s_k025+base_scaled+nearest",
+                     "tcd": "ens_ridge_s+ridge_s_k025+base_scaled+nearest",
+                     "substrate": "ref_ridge_blend", "byproduct": "ref_ridge_blend"},
+    # conservative: the 4-member nested OOF (the 3-member nested runs give 6.564 / 6.493, slightly better)
+    "overnight_v2": {"vcd": "ens_ridge_s+ridge_s_k025+base_scaled+nearest",
                      "tcd": "ens_ridge_s+ridge_s_k025+base_scaled+nearest",
                      "substrate": "ref_ridge_blend", "byproduct": "ref_ridge_blend"},
 }

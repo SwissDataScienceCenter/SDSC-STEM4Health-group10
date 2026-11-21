@@ -1,0 +1,4 @@
+,vcd,tcd,substrate,byproduct
+ridge_s_k025,0.3,0.3,0.9,0.8
+nearest,0.4,0.4,0.1,0.2
+ode_v3,0.3,0.3,0.0,0.0

@@ -68,13 +68,13 @@ def dataset(ids, B):
     F, Y = [], []
     for i in ids:
         b = B[i]
-        for k in range(12):
+        for k in range(13):
             s = b["st"][k]; F.append(feat(b, k, s)); Y.append(true_rates(b, k, s, b["V"][k]))
     return np.array(F), np.array(Y)
 
 def simulate(model, b, s_start):
     s = np.maximum(s_start, [1e-3, 1e-3, 1e-2, 1e-2]); out = [s]
-    for k in range(12):
+    for k in range(13):
         s = step(b, k, s, model.rates(feat(b, k, s))); out.append(s)
     return np.array(out)
 
@@ -85,7 +85,7 @@ def make_fp(dagger=False, blend=0.0):
             F2, Y2 = [F], [Y]
             for i in train_ids:
                 b = B[i]; s = b["st"][0]
-                for k in range(12):
+                for k in range(13):
                     r = model.rates(feat(b, k, s)); F2.append([feat(b, k, s)]); Y2.append([true_rates(b, k, s, b["V"][k])])
                     s = step(b, k, s, r)
             model = Model().fit(np.vstack([np.atleast_2d(a) for a in F2]), np.vstack([np.atleast_2d(a) for a in Y2]))
