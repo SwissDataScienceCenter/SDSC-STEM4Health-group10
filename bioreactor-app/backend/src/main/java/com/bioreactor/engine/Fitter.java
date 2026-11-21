@@ -62,8 +62,11 @@ public class Fitter {
     /**
      * Fit model to all training batches simultaneously.
      * Uses bounded Levenberg-Marquardt starting from the model's default parameter values.
+     *
+     * @param maxFunctionEvals maximum number of cost+Jacobian evaluations (like Python max_nfev)
+     *        Each LM iteration does 1 + N_params evaluations so 500 means ~20-25 iterations
      */
-    public FitResult fit(List<TrainingBatch> batches, int maxIterations) {
+    public FitResult fit(List<TrainingBatch> batches, int maxFunctionEvals) {
         List<ModelParameter> spec = model.parameters();
         List<ParamIndex> indices = new ArrayList<>();
         for (int i = 0; i < spec.size(); i++) {
@@ -97,23 +100,24 @@ public class Fitter {
                               new Array2DRowRealMatrix(jacobian));
         };
 
-        // Build the least-squares problem
+        // Hipparchus Levenberg-Marquardt:
+        // maxIterations = max LM outer loop iterations (controls restart attempts)
+        // maxEvaluations = max cost+Jacobian evaluations (the real limit)
+        // We set both high and let the internal convergence criteria stop earlier.
         LeastSquaresBuilder builder = new LeastSquaresBuilder();
         builder.model(modelFunc);
         builder.target(new double[points.size()]);
         builder.start(start);
-        builder.maxIterations(maxIterations);
-        builder.maxEvaluations(Math.max(maxIterations * spec.size(), 500));
+        builder.maxIterations(maxFunctionEvals);
+        builder.maxEvaluations(maxFunctionEvals);
 
         // Use Levenberg-Marquardt with parameter bounds
-        ParameterValidator validator = new ParameterValidator() {
-            @Override public RealVector validate(RealVector params) {
-                double[] bounded = new double[spec.size()];
-                for (int i = 0; i < spec.size(); i++) {
-                    bounded[i] = Math.min(upper[i], Math.max(lower[i], params.getEntry(i)));
-                }
-                return new ArrayRealVector(bounded);
+        ParameterValidator validator = params -> {
+            double[] bounded = new double[spec.size()];
+            for (int i = 0; i < spec.size(); i++) {
+                bounded[i] = Math.min(upper[i], Math.max(lower[i], params.getEntry(i)));
             }
+            return new ArrayRealVector(bounded);
         };
         builder.parameterValidator(validator);
 
@@ -123,15 +127,10 @@ public class Fitter {
         try {
             optimum = optimizer.optimize(problem);
         } catch (org.hipparchus.exception.MathIllegalStateException e) {
-            // Max iterations/evaluations exceeded — use the last point
-            optimum = optimizer.optimize(problem);
-            // If we can't even get an optimum, evaluate at start point
-            double[] startFitted = new double[spec.size()];
-            for (int i = 0; i < spec.size(); i++)
-                startFitted[i] = spec.get(i).fromUnconstrained(start[i]);
-            Map<String, Double> startMap = arrayToMap(spec, startFitted);
-            return new FitResult(startMap, startMap, false,
-                Double.POSITIVE_INFINITY, computeMAPE(batches, startMap), 0);
+            System.err.println("WARNING: Fitter hit evaluation limit (" + maxFunctionEvals + ")");
+            return new FitResult(
+                arrayToMap(spec, start), arrayToMap(spec, start), false,
+                Double.POSITIVE_INFINITY, computeMAPE(batches, arrayToMap(spec, start)), 0);
         }
 
         // Map fitted params back to natural scale
@@ -143,10 +142,12 @@ public class Fitter {
         Map<String, Double> fittedMap = arrayToMap(spec, fitted);
         Map<String, Double> mape = computeMAPE(batches, fittedMap);
 
+        boolean converged = optimum.getIterations() < maxFunctionEvals
+            && optimum.getEvaluations() < maxFunctionEvals;
         return new FitResult(
             fittedMap,
             arrayToMap(spec, start),
-            optimum.getIterations() < maxIterations,
+            converged,
             optimum.getRMS(),
             mape,
             optimum.getIterations()
@@ -156,12 +157,12 @@ public class Fitter {
     /**
      * Multi-start fit from several random initial points, taking the best result.
      */
-    public FitResult fitMultiStart(List<TrainingBatch> batches, int restarts, int maxIterPerStart) {
+    public FitResult fitMultiStart(List<TrainingBatch> batches, int restarts, int maxEvalsPerStart) {
         FitResult best = null;
         double bestCost = Double.POSITIVE_INFINITY;
 
         // Always try the nominal start
-        var nom = fit(batches, maxIterPerStart);
+        var nom = fit(batches, maxEvalsPerStart);
         if (nom.converged() && nom.finalCost() < bestCost) {
             best = nom;
             bestCost = nom.finalCost();
@@ -181,7 +182,7 @@ public class Fitter {
                 perturbed[i] = p.toUnconstrained(val);
             }
 
-            var result = fitFromStart(batches, maxIterPerStart, spec, perturbed);
+            var result = fitFromStart(batches, maxEvalsPerStart, spec, perturbed);
             if (result.converged() && result.finalCost() < bestCost) {
                 best = result;
                 bestCost = result.finalCost();
@@ -190,7 +191,7 @@ public class Fitter {
         return best;
     }
 
-    private FitResult fitFromStart(List<TrainingBatch> batches, int maxIterations,
+    private FitResult fitFromStart(List<TrainingBatch> batches, int maxFunctionEvals,
                                     List<ModelParameter> spec, double[] start) {
         double[] lower = new double[spec.size()];
         double[] upper = new double[spec.size()];
@@ -217,8 +218,8 @@ public class Fitter {
         builder.model(modelFunc);
         builder.target(new double[points.size()]);
         builder.start(start);
-        builder.maxIterations(maxIterations);
-        builder.maxEvaluations(Math.max(maxIterations * spec.size(), 500));
+        builder.maxIterations(maxFunctionEvals);
+        builder.maxEvaluations(maxFunctionEvals);
         builder.parameterValidator(params -> {
             double[] bounded = new double[spec.size()];
             for (int i = 0; i < spec.size(); i++)
@@ -234,8 +235,10 @@ public class Fitter {
             fitted[i] = spec.get(i).fromUnconstrained(optimum.getPoint().getEntry(i));
 
         Map<String, Double> fittedMap = arrayToMap(spec, fitted);
+        boolean converged = optimum.getIterations() < maxFunctionEvals
+            && optimum.getEvaluations() < maxFunctionEvals;
         return new FitResult(fittedMap, arrayToMap(spec, start),
-            optimum.getIterations() < maxIterations, optimum.getRMS(),
+            converged, optimum.getRMS(),
             computeMAPE(batches, fittedMap), optimum.getIterations());
     }
 
