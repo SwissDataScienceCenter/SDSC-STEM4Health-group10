@@ -1,0 +1,37 @@
+[v2_nutrient] fit on 42 batches done in 254s (cost 205.8)
+[v2_nutrient] fit on 42 batches done in 285s (cost 197.5)
+[v2_nutrient] fit on 42 batches done in 305s (cost 202.8)
+[v2_nutrient] fit on 42 batches done in 308s (cost 202.7)
+[v2_nutrient] fit on 42 batches done in 310s (cost 201.0)
+[v2_nutrient] fit on 49 batches done in 337s (cost 237.3)
+[v2_nutrient] fit on 42 batches done in 401s (cost 207.8)
+[v2_nutrient] fit on 42 batches done in 682s (cost 204.4)
+[v2_nutrient] full fit: cost=237.3 nfev=91 success=True (337s)
+        estimate  ci95_low      ci95_high  at_bound
+mu_max    5.0000    1.9575   1.277150e+01      True
+Ks        4.9077    0.3672   6.558530e+01     False
+kd0       0.0000    0.0000  1.014232e+304      True
+kd_S      1.9730    0.0000  7.749773e+166     False
+K_dS      0.0124    0.0000  8.231883e+166     False
+k_lys     0.0001    0.0000  1.014232e+304      True
+Yxs     200.0000    5.6985   7.019404e+03      True
+m         0.0257    0.0208   3.190000e-02     False
+q_ovf     0.4729    0.3790   5.901000e-01     False
+K_ovf     3.6231    3.4269   3.830600e+00     False
+n_ovf    12.0000    9.5113   1.513990e+01      True
+Yps       1.3202    1.1983   1.454500e+00     False
+qPc       0.0986    0.0066   1.480400e+00     False
+K_Pc      9.9998    0.5480   1.824754e+02      True
+C_sub    10.0000    1.3996   7.145020e+01      True
+C_b      15.0033   12.0761   1.864000e+01     False
+K_N       1.7851    0.2293   1.389620e+01     False
+Yxn      43.5802   33.3885   5.688290e+01     False
+C_Nb      0.0332    0.0000   8.885820e+04     False
+
+[v2_nutrient] cross-validation (7 folds by batch):
+            RMSE  relRMSE_%  MARE_%
+vcd        2.737     13.211   9.879
+tcd        2.791     12.919   9.598
+dcd        0.281     31.799  41.075
+substrate  0.543     23.743  25.370
+byproduct  0.256     16.921  14.802
