@@ -74,12 +74,13 @@ public class DTBPredictionService {
     }
 
     private Fitter.TrainingBatch toFitterBatch(DTBDataReader.DTBBatch b) {
+        var vcd = b.measurements().getOrDefault("vcd", List.of());
+        var tcd = b.measurements().getOrDefault("tcd", List.of());
+        var sub = b.measurements().getOrDefault("substrate", List.of());
+        var byp = b.measurements().getOrDefault("byproduct", List.of());
         return new Fitter.TrainingBatch(
             b.batchId(), b.initialState(), b.events(),
-            b.measurementTimes(),
-            b.measurements().getOrDefault("vcd", List.of()),
-            b.measurements().getOrDefault("substrate", List.of()),
-            b.measurements().getOrDefault("byproduct", List.of())
+            b.measurementTimes(), vcd, tcd, sub, byp
         );
     }
 

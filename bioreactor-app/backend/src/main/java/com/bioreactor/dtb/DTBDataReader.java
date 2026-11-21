@@ -29,7 +29,15 @@ public class DTBDataReader {
         List<Double> measurementTimes,
         Map<String, List<Double>> measurements,  // parameter code -> values at measurementTimes
         boolean isTest
-    ) {}
+    ) {
+        /** All measurement times including t=0. */
+        public List<Double> allTimes() {
+            List<Double> all = new ArrayList<>();
+            all.add(0.0);
+            all.addAll(measurementTimes);
+            return all;
+        }
+    }
 
     /**
      * Load a single DTB batch. Time is in days.
@@ -118,9 +126,10 @@ public class DTBDataReader {
             events.add(Simulator.Event.feedBolus(t, dV, Map.of("substrate", 0.0)));
         }
 
-        // Sampling events: set volume to measured volume
+        // Sampling events: set volume to measured volume (skip t=0, it's initial)
         for (int i = 0; i < measTimes.size(); i++) {
             double t = measTimes.get(i);
+            if (t < 1e-10) continue;  // t=0 is initial state, not a volume reset
             double vol = volVals.get(i);
             events.add(Simulator.Event.sampleVolume(t, vol));
         }

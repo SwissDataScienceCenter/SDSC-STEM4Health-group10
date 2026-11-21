@@ -23,7 +23,7 @@ public class DTBController {
         Map<String, Double> fittedParams,
         boolean converged,
         double finalCost,
-        Map<String, Double> rSquared,
+        Map<String, Double> mapePerVariable,
         int iterations
     ) {}
 
@@ -33,7 +33,7 @@ public class DTBController {
             Fitter.FitResult r = service.fitOnTrainingData();
             return ResponseEntity.ok(new FitResponse(
                 r.fittedParams(), r.converged(), r.finalCost(),
-                r.rSquared(), r.iterations()));
+                r.mapePerVariable(), r.iterations()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                 .body(Map.of("error", e.getMessage()));
