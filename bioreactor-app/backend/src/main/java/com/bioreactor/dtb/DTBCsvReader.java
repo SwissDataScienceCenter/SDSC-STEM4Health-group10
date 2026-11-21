@@ -138,14 +138,17 @@ public class DTBCsvReader {
             double byp0 = bypVals.isEmpty() ? 0.0 : bypVals.get(0);
             double vol0 = volVals.isEmpty() ? 10.0 : volVals.get(0);
 
+            // Initial hidden states: [N=1.0 (normalized nutrient), D=0 (no damage)]
+            double[] hidden = new double[]{1.0, 0.0};
             BioreactorState ic = new BioreactorState(
-                0, vcd0, 0, sub0, 0, byp0, 0.007, vol0, 37.0, 7.0
+                0, vcd0, 0, sub0, 0, byp0, 0.007, vol0, 37.0, 7.0, hidden
             );
 
-            Map<String, List<Double>> measurements = Map.of(
-                "vcd", vcdVals, "tcd", tcdVals,
-                "substrate", subVals, "byproduct", bypVals
-            );
+            Map<String, List<Double>> measurements = new HashMap<>();
+            measurements.put("vcd", vcdVals);
+            measurements.put("tcd", tcdVals);
+            measurements.put("substrate", subVals);
+            measurements.put("byproduct", bypVals);
 
             batches.add(new DTBBatch(bid, ic, events, measTimes, measurements, isTest));
         }
