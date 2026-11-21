@@ -156,7 +156,7 @@ def save_simulation_result(simulation_id: int, results: Dict, conn=None):
             f"{results['substrate'][i]:.6f}", f"{results['product'][i]:.6f}",
             f"{results['byproduct'][i]:.6f}", f"{results['dissolved_oxygen'][i]:.6f}",
             f"{results['volume'][i]:.6f}", f"{results['temperature'][i]:.6f}",
-            f"{results['ph'][i]:.6f}",
+            f"{results['pH'][i]:.6f}",
             '\\N', '\\N', '\\N', '\\N', '\\N',
             f"{results['viability'][i]:.6f}",
         ]) + '\n')
