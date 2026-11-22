@@ -1,0 +1,14 @@
+
+vcd: current 6.505 / 6.504
+   slope correction on ['log_byproduct0']: 6.497 / 6.512
+   slope correction on ['log_byproduct0', 'log_vcd0']: 6.550 / 6.558
+   de-shrink kappa=1.1: 6.492 / 6.502
+   de-shrink kappa=1.2: 6.524 / 6.545
+   de-shrink kappa=1.3: 6.596 / 6.623
+
+tcd: current 6.429 / 6.442
+   slope correction on ['log_byproduct0']: 6.420 / 6.449
+   slope correction on ['log_byproduct0', 'log_vcd0']: 6.478 / 6.494
+   de-shrink kappa=1.1: 6.420 / 6.437
+   de-shrink kappa=1.2: 6.466 / 6.484
+   de-shrink kappa=1.3: 6.550 / 6.571

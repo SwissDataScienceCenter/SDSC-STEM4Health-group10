@@ -1,0 +1,8 @@
+ridge clip q=0.0 vcd: all 6.924/6.954 -> 6.922/6.954 | affected batches (20): 7.06 -> 7.06
+ridge clip q=0.0 tcd: all 6.851/6.882 -> 6.848/6.880 | affected batches (20): 6.94 -> 6.94
+ridge clip q=0.05 vcd: all 6.924/6.954 -> 6.981/7.015 | affected batches (36): 6.86 -> 6.94
+ridge clip q=0.05 tcd: all 6.851/6.882 -> 6.907/6.936 | affected batches (36): 6.78 -> 6.85
+svr clip q=0.0 vcd: all 6.603/6.601 -> 6.584/6.596 | affected batches (20): 6.90 -> 6.86
+svr clip q=0.0 tcd: all 6.546/6.526 -> 6.522/6.514 | affected batches (20): 6.83 -> 6.79
+svr clip q=0.05 vcd: all 6.603/6.601 -> 6.571/6.596 | affected batches (36): 6.52 -> 6.49
+svr clip q=0.05 tcd: all 6.546/6.526 -> 6.500/6.513 | affected batches (36): 6.44 -> 6.40

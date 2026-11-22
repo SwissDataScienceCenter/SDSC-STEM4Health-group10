@@ -1,0 +1,5 @@
+late tau 0.03                       : 6.494 / 6.612
+late tau 0.01                       : 6.493 / 6.611
+late 0.03 + mid-run 0.1             : 6.468 / 6.554
+late 0.03 + mid-run 0.2             : 6.480 / 6.578
+late 0.03 + mid-run floor only 0.1  : 6.484 / 6.599
