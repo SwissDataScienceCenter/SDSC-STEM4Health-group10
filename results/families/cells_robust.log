@@ -1,0 +1,12 @@
+ridge REDUCED (current)                vcd: all 6.924/6.954 | extreme-lactate0 batches 7.94 | normal 6.80 | test-like mix 7.286/7.266
+ridge REDUCED (current)                tcd: all 6.851/6.882 | extreme-lactate0 batches 7.94 | normal 6.72 | test-like mix 7.238/7.218
+ridge REDUCED - log_byproduct0         vcd: all 7.263/7.242 | extreme-lactate0 batches 9.18 | normal 6.98 | test-like mix 7.929/7.867
+ridge REDUCED - log_byproduct0         tcd: all 7.211/7.174 | extreme-lactate0 batches 9.17 | normal 6.92 | test-like mix 7.894/7.817
+ridge vcd0,tcd0 + dynamic              vcd: all 7.322/7.323 | extreme-lactate0 batches 9.05 | normal 7.08 | test-like mix 7.900/7.904
+ridge vcd0,tcd0 + dynamic              tcd: all 7.265/7.245 | extreme-lactate0 batches 9.04 | normal 7.01 | test-like mix 7.856/7.850
+ridge vcd0,tcd0,V0,fb_tot + dynamic    vcd: all 7.291/7.272 | extreme-lactate0 batches 9.17 | normal 7.02 | test-like mix 7.920/7.912
+ridge vcd0,tcd0,V0,fb_tot + dynamic    tcd: all 7.234/7.200 | extreme-lactate0 batches 9.19 | normal 6.94 | test-like mix 7.880/7.874
+SVR sel (current)                      vcd: all 6.603/6.601 | extreme-lactate0 batches 7.26 | normal 6.51 | test-like mix 6.831/6.816
+SVR sel (current)                      tcd: all 6.546/6.526 | extreme-lactate0 batches 7.34 | normal 6.42 | test-like mix 6.842/6.769
+SVR sel - log_byproduct0               vcd: all 7.109/7.050 | extreme-lactate0 batches 9.43 | normal 6.75 | test-like mix 7.946/7.792
+SVR sel - log_byproduct0               tcd: all 7.040/6.988 | extreme-lactate0 batches 9.56 | normal 6.66 | test-like mix 7.946/7.792

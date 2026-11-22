@@ -1,0 +1,6 @@
+current best (LB 7.300): {'vcd': '6.505/6.504', 'tcd': '6.430/6.442', 'substrate': '6.468/6.554', 'byproduct': '7.903/7.833'}
+lambda=0.0: vcd: alone 7.07/7.07, blend w=0.1 gain -0.015/-0.013 | tcd: alone 7.03/7.01, blend w=0.1 gain -0.019/-0.016 | substrate: alone 10.77/10.72, blend w=0.1 gain -0.165/-0.121 | byproduct: alone 10.42/10.58, blend w=0.1 gain -0.110/-0.102
+lambda=0.25: vcd: alone 7.08/7.07, blend w=0.1 gain -0.015/-0.014 | tcd: alone 7.05/7.02, blend w=0.1 gain -0.020/-0.017 | substrate: alone 9.93/9.97, blend w=0.1 gain -0.122/-0.084 | byproduct: alone 10.54/10.68, blend w=0.1 gain -0.118/-0.108
+lambda=0.5: vcd: alone 7.11/7.12, blend w=0.1 gain -0.015/-0.015 | tcd: alone 7.09/7.06, blend w=0.1 gain -0.021/-0.020 | substrate: alone 9.58/9.71, blend w=0.1 gain -0.092/-0.065 | byproduct: alone 10.68/10.83, blend w=0.1 gain -0.124/-0.113
+lambda=0.75: vcd: alone 7.19/7.19, blend w=0.1 gain -0.014/-0.015 | tcd: alone 7.15/7.12, blend w=0.1 gain -0.022/-0.020 | substrate: alone 9.44/9.67, blend w=0.1 gain -0.065/-0.055 | byproduct: alone 10.92/11.00, blend w=0.1 gain -0.133/-0.111
+lambda=1.0: vcd: alone 7.29/7.27, blend w=0.1 gain -0.015/-0.015 | tcd: alone 7.23/7.19, blend w=0.1 gain -0.022/-0.019 | substrate: alone 9.70/10.08, blend w=0.1 gain -0.051/-0.052 | byproduct: alone 11.29/11.40, blend w=0.1 gain -0.146/-0.124

@@ -1,0 +1,4 @@
+reference kalman2 (LB 7.410): 6.574 / 6.719
+late constraints propagated, tau=0.03: 6.494 / 6.612
+late constraints propagated, tau=0.1: 6.509 / 6.630
+late constraints propagated, tau=0.2: 6.534 / 6.667
