@@ -82,7 +82,7 @@ class RealDataV3FitTest {
             var pred = cFitter.predict(hb, fit.fittedParams());
             for (int i = 1; i < hb.times().size(); i++) {
                 double t = hb.times().get(i);
-                var sim = nearestState(pred, t);
+                var sim = pred.at(t);
 
                 double oVcd = i < hb.observedVCD().size() ? hb.observedVCD().get(i) : Double.NaN;
                 double oTcd = i < hb.observedTCD().size() ? hb.observedTCD().get(i) : Double.NaN;
@@ -117,12 +117,4 @@ class RealDataV3FitTest {
         System.out.println("=".repeat(80) + "\n");
     }
 
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
-    }
 }

@@ -194,7 +194,7 @@ public class DTBSubmissionGenerator {
 
                 // Interpolate at each template time
                 for (double t : times) {
-                    var s = nearestState(pred, t);
+                    var s = pred.at(t);
                     double vcd = Math.max(0, s.xv());
                     double tcd = Math.max(0, s.xv() + s.xd());
                     double sub = Math.max(0, s.substrate());
@@ -210,15 +210,5 @@ public class DTBSubmissionGenerator {
         System.out.println("Done! Wrote " + totalRows + " rows to " + outputPath);
         System.out.println("Expected: " + templateRows + " template rows");
         System.out.println("=".repeat(70));
-    }
-
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        if (idx >= r.states().size()) return r.states().getLast();
-        return r.states().get(idx);
     }
 }

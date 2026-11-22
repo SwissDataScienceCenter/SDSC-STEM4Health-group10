@@ -26,7 +26,22 @@ public class RK4Simulator {
         this(model, 0.01);
     }
 
-    public record SimResult(List<Double> times, List<BioreactorState> states) {}
+    public record SimResult(List<Double> times, List<BioreactorState> states) {
+        /**
+         * Interpolate to find the nearest state at time t.
+         * Uses nearest-neighbor (step function) from the discrete trajectory.
+         */
+        public BioreactorState at(double t) {
+            if (times.isEmpty()) throw new IllegalStateException("empty result");
+            if (t <= times.get(0)) return states.get(0);
+            if (t >= times.get(times.size() - 1)) return states.get(times.size() - 1);
+            int idx = 0;
+            for (int i = 0; i < times.size(); i++) {
+                if (times.get(i) >= t) { idx = i; break; }
+            }
+            return states.get(idx);
+        }
+    }
 
     /**
      * Simulate using fixed-step RK4, applying events at grid boundaries.

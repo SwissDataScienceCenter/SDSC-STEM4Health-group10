@@ -40,7 +40,7 @@ class SingleBatchDiagnosticTest {
             var pred = fitter.predict(tb, params);
             for (int i = 0; i < b.measurementTimes().size(); i++) {
                 double t = b.measurementTimes().get(i);
-                var sim = nearestState(pred, t);
+                var sim = pred.at(t);
                 double vcd = sim.xv();
                 double tcd = sim.xv() + sim.xd();
                 double sub = Math.max(0, sim.substrate());
@@ -61,12 +61,4 @@ class SingleBatchDiagnosticTest {
         }
     }
 
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
-    }
 }

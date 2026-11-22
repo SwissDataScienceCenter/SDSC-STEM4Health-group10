@@ -65,7 +65,7 @@ class CrossValidationTest {
                 var pred = fitter.predict(vb, fit.fittedParams());
                 for (int i = 1; i < vb.times().size(); i++) {
                     double t = vb.times().get(i);
-                    var sim = nearestState(pred, t);
+                    var sim = pred.at(t);
                     double[] obs = {
                         i < vb.observedVCD().size() ? vb.observedVCD().get(i) : Double.NaN,
                         i < vb.observedTCD().size() ? vb.observedTCD().get(i) : Double.NaN,
@@ -95,12 +95,4 @@ class CrossValidationTest {
         System.out.println("  Python V3 7-fold CV: VCD=8.6% TCD=8.5% Sub=19.8% Byp=18.5% Mean=13.8%");
     }
 
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
-    }
 }

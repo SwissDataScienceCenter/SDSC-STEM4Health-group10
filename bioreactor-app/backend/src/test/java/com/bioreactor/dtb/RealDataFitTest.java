@@ -91,7 +91,7 @@ class RealDataFitTest {
                 var pred = fitter.predict(hb, fit.fittedParams());
                 for (int i = 1; i < hb.times().size(); i++) {
                     double t = hb.times().get(i);
-                    BioreactorState sim = nearestState(pred, t);
+                    BioreactorState sim = pred.at(t);
                     double obsVcd = i < hb.observedVCD().size() ? hb.observedVCD().get(i) : Double.NaN;
                     double obsTcd = i < hb.observedTCD().size() ? hb.observedTCD().get(i) : Double.NaN;
                     double obsSub = i < hb.observedSubstrate().size() ? hb.observedSubstrate().get(i) : Double.NaN;
@@ -150,12 +150,4 @@ class RealDataFitTest {
         );
     }
 
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
-    }
 }

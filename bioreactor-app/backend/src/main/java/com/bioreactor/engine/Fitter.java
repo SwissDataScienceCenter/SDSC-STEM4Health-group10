@@ -271,7 +271,7 @@ public class Fitter {
                 double obsSub = j < heldOut.observedSubstrate().size() ? heldOut.observedSubstrate().get(j) : Double.NaN;
                 double obsByp = j < heldOut.observedByproduct().size() ? heldOut.observedByproduct().get(j) : Double.NaN;
 
-                BioreactorState sim = nearestState(pred, t);
+                BioreactorState sim = pred.at(t);
 
                 if (!Double.isNaN(obsVcd) && obsVcd > 1e-6) {
                     totalVcd += Math.abs((sim.xv() - obsVcd) / obsVcd);
@@ -387,7 +387,7 @@ public class Fitter {
             RK4Simulator.SimResult sim = simResults.get(pt.batchId());
             if (sim == null) { residuals[i] = 0; continue; }
 
-            BioreactorState s = nearestState(sim, pt.t());
+            BioreactorState s = sim.at(pt.t());
             if (s == null) { residuals[i] = maxResidual; continue; }
             double pred, obs, scale;
 
@@ -473,7 +473,7 @@ public class Fitter {
             var pred = predict(b, params);
             for (int i = 1; i < b.times().size(); i++) {
                 double t = b.times().get(i);
-                BioreactorState sim = nearestState(pred, t);
+                BioreactorState sim = pred.at(t);
                 double obsVcd = i < b.observedVCD().size() ? b.observedVCD().get(i) : Double.NaN;
                 double obsTcd = i < b.observedTCD().size() ? b.observedTCD().get(i) : Double.NaN;
                 double obsSub = i < b.observedSubstrate().size() ? b.observedSubstrate().get(i) : Double.NaN;
@@ -510,14 +510,5 @@ public class Fitter {
         for (int i = 0; i < spec.size(); i++)
             map.put(spec.get(i).name(), values[i]);
         return map;
-    }
-
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
     }
 }

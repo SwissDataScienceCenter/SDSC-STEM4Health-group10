@@ -69,7 +69,7 @@ class V3FullModelFitTest {
             var pred = fitter.predict(hb, fit.fittedParams());
             for (int i = 1; i < hb.times().size(); i++) {
                 double t = hb.times().get(i);
-                var sim = nearestState(pred, t);
+                var sim = pred.at(t);
                 double[] obs = {
                     i < hb.observedVCD().size() ? hb.observedVCD().get(i) : Double.NaN,
                     i < hb.observedTCD().size() ? hb.observedTCD().get(i) : Double.NaN,
@@ -96,12 +96,4 @@ class V3FullModelFitTest {
         System.out.println("  Python V3 ref: VCD=8.6% TCD=8.5% Sub=19.8% Byp=18.5% Mean=13.8%");
     }
 
-    private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
-        int idx = 0;
-        for (int i = 0; i < r.times().size(); i++) {
-            if (r.times().get(i) >= t) { idx = i; break; }
-            idx = i;
-        }
-        return r.states().get(idx);
-    }
 }
