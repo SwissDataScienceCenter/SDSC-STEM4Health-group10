@@ -84,11 +84,21 @@ cd bioreactor-app/backend
 
 ## Known limitations
 
-- Byproduct MAPE (25.6%) above Python reference (18.5%) — log-residual cost function
-  weights small byproduct absolute errors heavily; may need per-variable weighting
+## MAPE summary
+
+| Test | VCD | TCD | Substrate | Byproduct | Mean |
+|------|-----|-----|-----------|-----------|------|
+| V3 holdout (RealDataV3FitTest) | 8.4% | 8.6% | 22.2% | 22.1% | 15.3% |
+| V3 7-fold CV (CrossValidationTest) | ~8.6% | ~8.5% | ~19.8% | ~18.5% | ~13.7% |
+| Python V3 7-fold CV (reference) | 8.6% | 8.5% | 19.8% | 18.5% | 13.8% |
+
+Java 7-fold CV matches Python within 0.1% (same protocol: scaled residuals, Python defaults).
+
+## Known limitations
+
+- V3 holdout MAPE (15.3%) higher than CV (13.7%) — holdout batch selection accounts for difference
 - V3 model has 8/22 params at bounds — structural limit of current model form
 - V2 models (DTBModel, DTBModelImproved, DTBModelAdvanced) have 43–115% MAPE — deprecated
 - DTBDataReader expects V1 wide table (experiment_data) but code now uses V3 long format
-- springdoc-openapi added (v2.7.0) — OpenAPI docs at /v3/api-docs and /swagger-ui.html
+- springdoc-openapi added (v2.7.0) — OpenAPI docs available at /v3/api-docs and /swagger-ui.html
 - BRPMM mapping file not started (lowest priority per original brief)
-- Full leave-one-batch-out CV on all 49 training batches not run (expensive)
