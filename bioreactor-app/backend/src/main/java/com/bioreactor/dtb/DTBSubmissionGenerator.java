@@ -14,13 +14,11 @@ import java.util.*;
  *     /path/to/bioreaction_remaining.csv
  *     /path/to/bioreaction_template.csv
  *     /path/to/output_submission.csv
+ *     [--skip-cv] [--no-fit] [--model=V3|V3Constrained]
  *
- * Reads the data CSV, the submission template, fits on all training batches,
- * and writes predictions for all 12 test batches in the submission template format:
- *   batch_id,elapsed_time,vcd,tcd,substrate,byproduct
- *
- * The model used is DTBV3ConstrainedModel (12 free params, 10 locked to CHO literature).
- * If fitting fails, falls back to default parameters.
+ * By default fits DTBV3Model (22 params, Python defaults) on all training batches.
+ * --skip-cv: skip the cross-validation step (faster)
+ * --no-fit:  use default parameters without fitting
  */
 public class DTBSubmissionGenerator {
 
@@ -36,6 +34,15 @@ public class DTBSubmissionGenerator {
         String inputPath = args[0];
         String templatePath = args[1];
         String outputPath = args[2];
+
+        boolean skipCV = false;
+        boolean noFit = false;
+        String modelSel = "V3";  // V3 or V3Constrained
+        for (String a : args) {
+            if ("--skip-cv".equals(a)) skipCV = true;
+            if ("--no-fit".equals(a)) noFit = true;
+            if (a.startsWith("--model=")) modelSel = a.substring("--model=".length());
+        }
 
         System.out.println("=".repeat(70));
         System.out.println("  DTB SUBMISSION GENERATOR");
@@ -54,8 +61,11 @@ public class DTBSubmissionGenerator {
         System.out.println("\nLoaded " + all.size() + " batches: " +
             train.size() + " train, " + test.size() + " test");
 
-        var model = new DTBV3ConstrainedModel();
+        ProcessModel model = modelSel.equals("V3Constrained") ?
+            new DTBV3ConstrainedModel() : new DTBV3Model();
         var fitter = new Fitter(model);
+        System.out.println("  Model: " + model.getClass().getSimpleName() +
+            " (" + model.parameters().size() + " params)");
 
         // Convert training batches
         List<Fitter.TrainingBatch> fitBatches = new ArrayList<>();
@@ -71,34 +81,44 @@ public class DTBSubmissionGenerator {
                 b.measurements().getOrDefault("byproduct", List.of())));
         }
 
-        // Compute training MAPE (leave-one-batch-out CV on a subset for speed)
-        System.out.println("\nComputing training MAPE (10-fold CV on 30 batches)...");
-        Collections.shuffle(fitBatches, new Random(42));
-        List<Fitter.TrainingBatch> cvBatches = fitBatches.subList(0, Math.min(30, fitBatches.size()));
-        Map<String, Double> cvMape = fitter.crossValidate(cvBatches, 500);
-        System.out.printf("  VCD=%.1f%% TCD=%.1f%% Sub=%.1f%% Byp=%.1f%%%n",
-            cvMape.getOrDefault("mape_vcd", Double.NaN),
-            cvMape.getOrDefault("mape_tcd", Double.NaN),
-            cvMape.getOrDefault("mape_substrate", Double.NaN),
-            cvMape.getOrDefault("mape_byproduct", Double.NaN));
-
-        // Fit
-        System.out.println("\nFitting on " + fitBatches.size() + " training batches...");
-        long startMs = System.currentTimeMillis();
-        Fitter.FitResult fit = fitter.fit(fitBatches, 2000);
-        long elapsed = (System.currentTimeMillis() - startMs) / 1000;
-
-        if (!fit.converged()) {
-            System.out.println("WARNING: Fitter did not converge. Using default parameters.");
-            Map<String, Double> defaults = new HashMap<>();
-            for (ModelParameter mp : model.parameters()) defaults.put(mp.name(), mp.startValue());
-            fit = new Fitter.FitResult(defaults, defaults, false, Double.NaN,
-                Map.of(), 0);
+        // Optional: compute training MAPE via CV
+        if (!skipCV) {
+            System.out.println("\nComputing training MAPE (3-fold CV on 15 batches)...");
+            Collections.shuffle(fitBatches, new Random(42));
+            List<Fitter.TrainingBatch> cvBatches = fitBatches.subList(0, Math.min(15, fitBatches.size()));
+            Map<String, Double> cvMape = fitter.crossValidate(cvBatches, 300);
+            System.out.printf("  VCD=%.1f%% TCD=%.1f%% Sub=%.1f%% Byp=%.1f%%%n",
+                cvMape.getOrDefault("mape_vcd", Double.NaN),
+                cvMape.getOrDefault("mape_tcd", Double.NaN),
+                cvMape.getOrDefault("mape_substrate", Double.NaN),
+                cvMape.getOrDefault("mape_byproduct", Double.NaN));
         }
 
-        System.out.println("Time: " + elapsed + "s | Converged: " + fit.converged() +
-            " | Iter: " + fit.iterations() + " | RMS: " +
-            String.format("%.6f", fit.converged() ? fit.finalCost() : Double.NaN));
+        // Fit or use defaults
+        Fitter.FitResult fit;
+        if (noFit) {
+            System.out.println("\nSkipping fit (--no-fit), using default parameters");
+            Map<String, Double> defaults = new HashMap<>();
+            for (ModelParameter mp : model.parameters()) defaults.put(mp.name(), mp.startValue());
+            fit = new Fitter.FitResult(defaults, defaults, true, 0.0, Map.of(), 0);
+        } else {
+            System.out.println("\nFitting on " + fitBatches.size() + " training batches...");
+            long startMs = System.currentTimeMillis();
+            fit = fitter.fit(fitBatches, 1000);
+            long elapsed = (System.currentTimeMillis() - startMs) / 1000;
+
+            if (!fit.converged()) {
+                System.out.println("WARNING: Fitter did not converge. Using default parameters.");
+                Map<String, Double> defaults = new HashMap<>();
+                for (ModelParameter mp : model.parameters()) defaults.put(mp.name(), mp.startValue());
+                fit = new Fitter.FitResult(defaults, defaults, false, Double.NaN,
+                    Map.of(), 0);
+            }
+
+            System.out.println("Time: " + elapsed + "s | Converged: " + fit.converged() +
+                " | Iter: " + fit.iterations() + " | RMS: " +
+                String.format("%.6f", fit.converged() ? fit.finalCost() : Double.NaN));
+        }
 
         System.out.println("\nFitted parameters:");
         for (var mp : model.parameters()) {

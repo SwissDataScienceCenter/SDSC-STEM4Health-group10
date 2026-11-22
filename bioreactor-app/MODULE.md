@@ -60,21 +60,21 @@ cd bioreactor-app/backend
 - [x] Java-vs-Python port validation (Monod: VCD MARE 0.0001%, Sub MARE 0.0001%)
 - [x] Feed architecture: per-stream concentrations resolved from model
 - [x] Fast fixed-step RK4 simulator (dt=0.01, matches Python)
-- [x] DTBV3ConstrainedModel: 12 free params, 10 locked to CHO literature
+- [x] DTBV3ConstrainedModel: 12 free params, 10 locked to Python V3 literatures
 - [x] Submission CSV generator (DTBSubmissionGenerator, reads template, 156 rows)
 - [x] Python ProcessBuilder call removed (SimulationService is pure Java)
 - [x] DTBCsvReader uses feed names (model resolves concentrations + hidden N)
 - [x] Fitter.predict uses last event time for test batches (fixes tEnd=0 bug)
 - [x] Jacobian perturbation improved (relative+absolute, avoids singular matrix)
 - [x] Residual clamping to prevent Inf in LM cost function
+- [x] V3 model defaults set to team Python fit (MAPE 14.6% without fitting)
+- [x] V3Constrained fitted MAPE: VCD=8.5% TCD=8.8% Sub=21.4% Byp=25.6% Mean=16.1%
 
 ## In progress
 
-- [ ] MAPE on DTB batches matching team v3 (~8.6% VCD, ~8.5% TCD, ~19.8% sub)
-  Current: DTBV3ConstrainedModel CV MAPE ~61% VCD, 55% TCD, 33% Sub, 44% Byp
-  The 10 locked literature parameters need tuning for this data set.
-  The unfitted V3 model (22 params) has lower holdout MAPE (21%) but does not
-  converge when fitted — parameters highly correlated, model may be overparameterized.
+- [ ] Byproduct MAPE (25.6%) still above Python V3 reference (18.5%)
+  Fitting degrades byproduct while improving VCD — tradeoff in cost function.
+  Python V3 had 8 of 22 params at bounds, so model is near structural limit.
 
 ## Not yet done
 
