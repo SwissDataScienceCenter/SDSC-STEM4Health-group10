@@ -20,6 +20,9 @@ public interface ProcessModel {
     /** Indices of hidden states NOT diluted by feeds (e.g. damage history). Default empty. */
     default java.util.Set<Integer> undilutedHiddenIndices() { return java.util.Collections.emptySet(); }
 
+    /** Default initial values for hidden states. Override in models that have hidden states. */
+    default double[] defaultHiddenState() { return new double[hiddenStateCount()]; }
+
     /**
      * Rates of change for each state variable, given the current state and parameters.
      * Returns a double[] of length CORE_STATE_SIZE + hiddenStateCount().

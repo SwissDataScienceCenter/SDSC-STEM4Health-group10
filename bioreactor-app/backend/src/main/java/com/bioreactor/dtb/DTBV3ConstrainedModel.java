@@ -16,6 +16,7 @@ public class DTBV3ConstrainedModel implements ProcessModel {
     private static final double kd_D = 0.04581, k_r = 9.983, k_lys = 0.3083, K_Pc = 27.336;
 
     @Override public int hiddenStateCount() { return 2; }
+    @Override public double[] defaultHiddenState() { return new double[]{1.0, 0.0}; }
     @Override public Set<Integer> undilutedHiddenIndices() { return Set.of(HIDDEN_D); }
 
     @Override

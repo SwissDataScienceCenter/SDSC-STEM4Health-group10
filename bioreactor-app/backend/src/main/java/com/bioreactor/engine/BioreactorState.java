@@ -32,6 +32,7 @@ public record BioreactorState(
     }
 
     /** Get a hidden state by index (0-based). */
+    public int hiddenCount() { return hidden.length; }
     public double hidden(int idx) {
         return idx < hidden.length ? hidden[idx] : 0;
     }
