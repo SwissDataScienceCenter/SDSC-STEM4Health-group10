@@ -1,6 +1,7 @@
 package com.bioreactor.dtb;
 
 import com.bioreactor.engine.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -9,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Head-to-head comparison of model variants on synthetic DTB-like data.
+ * Tagged @Tag("slow") — excluded from default mvn test to keep CI fast.
  *
  * Uses the DTBModelAdvanced (threshold inhibition + byproduct consumption)
  * as ground truth to generate training data that mimics real DTB behavior:
@@ -17,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Byproduct rises then is consumed in late phase (as seen in real data!)
  * - Only Feed B carries substrate (C and D are pH control / trace, confirmed by data)
  */
+@Tag("slow")
 class ModelVariantComparisonTest {
 
     // Ground truth params for the Advanced model

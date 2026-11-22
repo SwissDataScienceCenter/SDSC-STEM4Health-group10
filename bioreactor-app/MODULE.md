@@ -48,10 +48,12 @@ cd bioreactor-app/backend
 
 ## Verified
 
-- [x] 35 tests pass (mvn verify): EngineTest(5) + PythonPortTest(2) + DTBV3ModelPortTest(5)
+- [x] mvn verify: 38 tests pass (<2min): EngineTest(5) + PythonPortTest(2) + DTBV3ModelPortTest(5)
        + RealDataV3FitTest(1) + RealDataFitTest(1) + EngineIntegrationTest(3)
        + ModelVariantComparisonTest(6) + V3GIModelComparisonTest(1) + V3FullModelFitTest(1)
        + UnitTests(7) + SingleBatchDiagnosticTest(1) + CrossValidationTest(1)
+       + CsvImporterTest(3)
+- [x] CI-fast: @Tag("slow") excludes CrossValidationTest + ModelVariantComparisonTest from default mvn test (30/38 pass in <2min)
 - [x] Simulator uses model.rates() correctly
 - [x] Bolus mass balance (feed + volume reset)
 - [x] Fitter converges on synthetic data (Levenberg-Marquardt)

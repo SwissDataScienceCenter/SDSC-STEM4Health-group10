@@ -1,6 +1,7 @@
 package com.bioreactor.dtb;
 
 import com.bioreactor.engine.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
@@ -9,7 +10,9 @@ import java.util.*;
 /**
  * 7-fold cross-validation MAPE using scaled residuals.
  * Mimics Python run_cv.py with 7 folds.
+ * Tagged @Tag("slow") — excluded from default mvn test to keep CI fast.
  */
+@Tag("slow")
 class CrossValidationTest {
 
     private static final String CSV_PATH = "/home/renku/work/input-data/Project 1 - DTB/bioreaction_remaining.csv";
