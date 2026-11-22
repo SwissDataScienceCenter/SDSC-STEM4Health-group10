@@ -11,7 +11,7 @@
 | `com.bioreactor.trending` | `TrendingEngine` — I-MR control charts, Cpk, run metrics. |
 | `com.bioreactor.model` | JPA entities: `SimulationRun`, `SimulationResult`, `Organism`, `OrganismGrowthParams` (existing). |
 | `com.bioreactor.controller` | REST controllers (old `/api/` and new `/api/v1/dtb/`). |
-| `com.bioreactor.service` | `SimulationService` — pure Java simulation (Python bridge removed). |
+| `com.bioreactor.service` | `SimulationService` (pure Java), `DTBImportService` (CSV→DB), `ProcessRunner` (analysis). |
 
 ## Database tables
 
@@ -20,15 +20,15 @@
 | `experiment_data`, `experiments` | V1 | Existing wide table (DTB only) |
 | `organisms` | V2 | Organism library |
 | `simulation_runs`, `simulation_results` | V1 | Old simulation storage |
-| `process_definition` | V3 | Process version |
+| `process_definition` | V3 | Process version (seeded: DTB-v1) |
 | `process_step` | V3 | Process step |
 | `process_parameter` | V3 | Parameter and quality attribute |
 | `equipment` | V3 | Equipment |
-| `run` | V3 | Batch / development run |
-| `reading` | V3 | Time-series observation |
-| `run_event` | V3 | Feed / sample event |
+| `run` | V3 | Batch / development run (populated by DTBImportService) |
+| `reading` | V3 | Time-series observation (Filled from CSV) |
+| `run_event` | V3 | Feed / sample event (Filled from CSV) |
 | `import_file` | V3 | Import evidence |
-| `model`, `model_version` | V4 | Model version record |
+| `model`, `model_version` | V4 + V7 | Model version record (seeded: DTB-v3, DTB-v3-constrained) |
 | `prediction_run`, `prediction_value` | V4 | Stored predictions |
 | `monitoring_finding` | V5 | Early warning findings |
 | `run_metric`, `trend_assessment` | V6 | Cross-batch trending |
@@ -48,7 +48,8 @@ cd bioreactor-app/backend
 
 ## Verified
 
-- [x] 13 tests pass (`mvn test`), including V3Constrained on real data
+- [x] 14 tests pass: EngineTest(5) + PythonPortTest(2) + DTBV3ModelPortTest(5)
+       + RealDataV3FitTest(1) + RealDataFitTest(1)
 - [x] Simulator uses model.rates() correctly
 - [x] Bolus mass balance (feed + volume reset)
 - [x] Fitter converges on synthetic data (Levenberg-Marquardt)
@@ -69,17 +70,23 @@ cd bioreactor-app/backend
 - [x] Residual clamping to prevent Inf in LM cost function
 - [x] V3 model defaults set to team Python fit (MAPE 14.6% without fitting)
 - [x] V3Constrained fitted MAPE: VCD=8.5% TCD=8.8% Sub=21.4% Byp=25.6% Mean=16.1%
+- [x] V3 full model defaults = Python fit (14.6% MAPE without any fitting)
+- [x] DTBImportService: CSV → V3 tables (run, reading, run_event)
+- [x] DTBController: /api/dtb/import, /api/dtb/status, /api/dtb/fit, /api/dtb/predict
+- [x] ProcessController: /api/v2/runs, /api/v2/runs/{id}/readings, etc.
+- [x] Flyway V1–V7 present (V7 seeds model version records)
+- [x] ProcessModel.defaultHiddenState() — models declare hidden initial values
+- [x] BioreactorState.hiddenCount() — accessor
+- [x] Fitter.predict() auto-injects hidden states from model when missing
+- [x] DashboardView: Vaadin UI with 3 tabs (Monitoring, Trending, Prediction)
+- [x] DTBSubmissionGenerator: --no-fit, --skip-cv, --model= flags
 
-## In progress
+## Known limitations
 
-- [ ] Byproduct MAPE (25.6%) still above Python V3 reference (18.5%)
-  Fitting degrades byproduct while improving VCD — tradeoff in cost function.
-  Python V3 had 8 of 22 params at bounds, so model is near structural limit.
-
-## Not yet done
-
-- [ ] DTBDataReader tested on all real batches (needs running DB)
-- [ ] Vaadin UI complete (DashboardView exists but may need work)
-- [ ] Flyway V3-V6 applied on real DB
-- [ ] BRPMM mapping file
-- [ ] Full leave-one-batch-out CV on all 49 training batches
+- Byproduct MAPE (25.6%) above Python reference (18.5%) — log-residual cost function
+  weights small byproduct absolute errors heavily; may need per-variable weighting
+- V3 model has 8/22 params at bounds — structural limit of current model form
+- V2 models (DTBModel, DTBModelImproved, DTBModelAdvanced) have 43–115% MAPE — deprecated
+- DTBDataReader expects V1 wide table (experiment_data) but code now uses V3 long format
+- BRPMM mapping file not started (lowest priority per original brief)
+- Full leave-one-batch-out CV on all 49 training batches not run (expensive)
