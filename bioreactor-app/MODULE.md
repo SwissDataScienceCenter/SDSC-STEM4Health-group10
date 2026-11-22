@@ -85,11 +85,10 @@ cd bioreactor-app/backend
 ## Known limitations
 
 - Byproduct MAPE (25.6%) above Python reference (18.5%) — log-residual cost function
-  weights small byproduct absolute errors heavily; may need per-variable weighting.
-  Improving towards Python reference — structural model improvements in progress.
+  weights small byproduct absolute errors heavily; may need per-variable weighting
 - V3 model has 8/22 params at bounds — structural limit of current model form
 - V2 models (DTBModel, DTBModelImproved, DTBModelAdvanced) have 43–115% MAPE — deprecated
 - DTBDataReader expects V1 wide table (experiment_data) but code now uses V3 long format
-- springdoc-openapi added (v2.7.0) — OpenAPI docs available at /v3/api-docs and /swagger-ui.html
+- springdoc-openapi added (v2.7.0) — OpenAPI docs at /v3/api-docs and /swagger-ui.html
 - BRPMM mapping file not started (lowest priority per original brief)
 - Full leave-one-batch-out CV on all 49 training batches not run (expensive)
