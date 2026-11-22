@@ -85,53 +85,53 @@ public class RK4Simulator {
             }
 
             // 2. Apply events at the end of step k (after RK4, matching Python)
+            //   ORDER: volume reset first, then feed boluses (matching Python)
             for (var ev : stepEvents[k]) {
-                switch (ev.type()) {
-                    case FEED_BOLUS -> {
-                        Map<String, Double> conc = ev.feedConcentrations();
-                        if (conc == null && ev.feedName() != null) {
-                            conc = model.feedStreamConcentrations(ev.feedName(), params);
-                        }
-                        if (conc != null && !conc.isEmpty()) {
-                            double C_feed = conc.getOrDefault("substrate", 0.0);
-                            double C_N = conc.getOrDefault("hidden_0", 0.0);
-                            double Vnew = V + ev.dV();
-                            double ratio = V / Vnew;
-                            double fRatio = ev.dV() / Vnew;
+                if (ev.type() == Simulator.Event.EventType.SAMPLE_VOLUME) {
+                    if (ev.measuredVolume() != null) V = ev.measuredVolume();
+                }
+            }
+            for (var ev : stepEvents[k]) {
+                if (ev.type() != Simulator.Event.EventType.FEED_BOLUS) continue;
+                Map<String, Double> conc = ev.feedConcentrations();
+                if (conc == null && ev.feedName() != null) {
+                    conc = model.feedStreamConcentrations(ev.feedName(), params);
+                }
+                if (conc != null && !conc.isEmpty()) {
+                    double C_feed = conc.getOrDefault("substrate", 0.0);
+                    double C_N = conc.getOrDefault("hidden_0", 0.0);
+                    double Vnew = V + ev.dV();
+                    double ratio = V / Vnew;
+                    double fRatio = ev.dV() / Vnew;
 
-                            // Save pre-dilution hidden states for undiluted indices
-                            double[] savedHidden = null;
-                            if (x.length > BioreactorState.CORE_STATE_SIZE && !undilutedSet.isEmpty()) {
-                                savedHidden = new double[x.length - BioreactorState.CORE_STATE_SIZE];
-                                System.arraycopy(x, BioreactorState.CORE_STATE_SIZE, savedHidden, 0, savedHidden.length);
-                            }
-
-                            // Mass balance for core states
-                            x[0] = x[0] * ratio;  // Xv diluted
-                            x[1] = x[1] * ratio;  // Xd diluted
-                            x[2] = x[2] * ratio + C_feed * fRatio;  // S
-                            x[3] = x[3] * ratio;  // P diluted
-                            x[4] = x[4] * ratio;  // B diluted
-
-                            // Hidden states: dilute unless undiluted
-                            if (x.length > BioreactorState.CORE_STATE_SIZE) {
-                                for (int hi = 0; hi < x.length - BioreactorState.CORE_STATE_SIZE; hi++) {
-                                    int idx = BioreactorState.CORE_STATE_SIZE + hi;
-                                    if (undilutedSet.contains(hi)) {
-                                        x[idx] = savedHidden[hi];  // restore pre-dilution value
-                                    } else {
-                                        x[idx] = x[idx] * ratio;  // diluted
-                                    }
-                                }
-                                // Feed B carries hidden nutrient N
-                                x[BioreactorState.CORE_STATE_SIZE] += C_N * fRatio;
-                            }
-                            V = Vnew;
-                        }
+                    // Save pre-dilution hidden states for undiluted indices
+                    double[] savedHidden = null;
+                    if (x.length > BioreactorState.CORE_STATE_SIZE && !undilutedSet.isEmpty()) {
+                        savedHidden = new double[x.length - BioreactorState.CORE_STATE_SIZE];
+                        System.arraycopy(x, BioreactorState.CORE_STATE_SIZE, savedHidden, 0, savedHidden.length);
                     }
-                    case SAMPLE_VOLUME -> {
-                        if (ev.measuredVolume() != null) V = ev.measuredVolume();
+
+                    // Mass balance for core states
+                    x[0] = x[0] * ratio;  // Xv diluted
+                    x[1] = x[1] * ratio;  // Xd diluted
+                    x[2] = x[2] * ratio + C_feed * fRatio;  // S
+                    x[3] = x[3] * ratio;  // P diluted
+                    x[4] = x[4] * ratio;  // B diluted
+
+                    // Hidden states: dilute unless undiluted
+                    if (x.length > BioreactorState.CORE_STATE_SIZE) {
+                        for (int hi = 0; hi < x.length - BioreactorState.CORE_STATE_SIZE; hi++) {
+                            int idx = BioreactorState.CORE_STATE_SIZE + hi;
+                            if (undilutedSet.contains(hi)) {
+                                x[idx] = savedHidden[hi];  // restore pre-dilution value
+                            } else {
+                                x[idx] = x[idx] * ratio;  // diluted
+                            }
+                        }
+                        // Feed B carries hidden nutrient N
+                        x[BioreactorState.CORE_STATE_SIZE] += C_N * fRatio;
                     }
+                    V = Vnew;
                 }
             }
 
