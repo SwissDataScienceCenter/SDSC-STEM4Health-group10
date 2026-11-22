@@ -1,0 +1,24 @@
+,estimate,ci95_low,ci95_high,at_bound,unit,meaning
+mu_max,4.706129940117167,3.4315088518011807,6.45420424943448,False,1/d,maximum specific growth rate
+Ks,2.7067602725961004,1.6756569537206178,4.37234551919275,False,g/L,Monod half-saturation constant for substrate (growth)
+K_N,0.3527299458368987,0.21526321044075947,0.5779827144422409,False,N0,half-saturation of growth on the hidden nutrient
+Yxn,41.96602950945787,40.41666757596382,43.574785810299204,False,cells/N0,biomass yield on the hidden nutrient
+C_Nb,0.00010000000011896023,8.655737664007176e-112,1.1553030385122032e+103,True,N0,hidden nutrient concentration in Feed B
+kd0,1.0000000000000023e-06,0.0,1.0142320547350045e+304,True,1/d,basal specific death rate
+kd_N,0.03170177143536268,0.006968149922620201,0.14422799786174384,False,1/d,extra death rate once the hidden nutrient is depleted (H1)
+K_dN,0.00036009203255499695,4.331965291482782e-05,0.0029932435554026727,False,N0,nutrient level below which H1 death kicks in
+kd_D,0.004372312976801214,0.00037673099569467816,0.05074475152184657,False,1/(d * g/L d),death rate per unit of accumulated byproduct exposure (H2)
+k_r,1.0907227951999192,0.14498658492535857,8.205422705701977,False,1/d,decay ('repair') rate of the byproduct damage
+k_lys,0.049108377106637596,0.0018975266359806807,1.2709348350208256,False,1/d,lysis rate of dead cells
+Yxs,9999.999999994023,3.3290220256134794e-93,3.003885202034686e+100,True,cells/g,biomass yield on substrate (growth part)
+m,0.0580470379660683,0.05069282832947534,0.06646815195898238,False,g/(cells d),maintenance substrate uptake
+q_ovf,1.931926204733427,0.5984067454994634,6.237126985292397,False,g/(cells d),maximum overflow uptake
+K_ovf,2.614094922941955,2.534978094120944,2.6956809930622136,False,g/L,substrate level for half-maximal overflow
+n_ovf,19.99999999999999,11.141932684631792,35.900414346581414,True,-,steepness (Hill coefficient) of the overflow switch
+K_iP,0.17588029838883398,0.04622391030807167,0.6692181417620907,False,g/L,byproduct level that halves the overflow (lactate shift)
+Yps,1.3356467859313512,1.1913508073624453,1.497419841195454,False,g/g,byproduct produced per substrate overflowed
+qPc,1.9999999999009628,0.34589874492756784,11.56407780676239,True,g/(cells d),maximum specific byproduct consumption
+K_Pc,28.358595531540377,4.323684896934503,186.00105227179884,False,g/L,half-saturation of byproduct consumption
+C_sub,1.000021548709241,1.373408123661536e-09,728147067.6150469,True,g/L,substrate concentration in the substrate feed
+C_b,74.45592495937267,68.81829965805304,80.55538699882739,False,g/L,substrate concentration in Feed B
+K_IP,0.7582447001117113,0.46607260096171904,1.2335739626426168,False,g/L,byproduct level that halves growth (growth inhibition)

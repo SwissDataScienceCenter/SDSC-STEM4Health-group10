@@ -1,0 +1,20 @@
+,estimate,ci95_low,ci95_high,at_bound,unit,meaning
+mu_max,4.999999999999998,1.9574802855181472,12.771520706979917,True,1/d,maximum specific growth rate
+Ks,4.907708004089636,0.3672407691960513,65.5853049925059,False,g/L,Monod half-saturation constant for substrate (growth)
+kd0,1.0003419386003173e-05,0.0,1.0142320547350045e+304,True,1/d,basal specific death rate
+kd_S,1.9729820560381977,5.022931597072477e-167,7.749773450463577e+166,False,1/d,extra death rate under substrate limitation
+K_dS,0.01241593380993049,1.8726629311671498e-171,8.231882513768949e+166,False,g/L,substrate level below which extra death kicks in
+k_lys,0.00010001077694410424,0.0,1.0142320547350045e+304,True,1/d,lysis rate of dead cells
+Yxs,199.99999999973062,5.698489579234139,7019.403904089989,True,cells/g,biomass yield on substrate (growth part)
+m,0.025744779788060435,0.02077554274445303,0.031902593086897225,False,g/(cells d),maintenance substrate uptake
+q_ovf,0.47290978759411106,0.37896128762368525,0.5901491115482727,False,g/(cells d),maximum overflow uptake
+K_ovf,3.6231317851445164,3.426863591074386,3.830640929716407,False,g/L,substrate level for half-maximal overflow
+n_ovf,11.999999999999995,9.511272557896639,15.139929922462931,True,-,steepness (Hill coefficient) of the overflow switch
+Yps,1.320199026169698,1.1983082655416941,1.4544883973670428,False,g/g,byproduct produced per substrate overflowed
+qPc,0.09857365695636704,0.00656347546658674,1.4804299787844892,False,g/(cells d),maximum specific byproduct consumption
+K_Pc,9.999845565717113,0.548002141614058,182.47540245676097,True,g/L,half-saturation of byproduct consumption
+C_sub,10.000000572511407,1.3995757009858965,71.45023408150483,True,g/L,substrate concentration in the substrate feed
+C_b,15.003252604221718,12.076082897910801,18.639950603935347,False,g/L,substrate concentration in Feed B
+K_N,1.7851308260420555,0.22932166531650908,13.896166599380525,False,N0,half-saturation of growth on the hidden nutrient
+Yxn,43.580190658840515,33.388497055547695,56.88285443640004,False,cells/N0,biomass yield on the hidden nutrient
+C_Nb,0.033215119512182374,1.2415783110079506e-08,88858.20205033306,False,N0,hidden nutrient concentration in Feed B

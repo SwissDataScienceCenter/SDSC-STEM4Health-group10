@@ -1,0 +1,34 @@
+/home/renku/work/SDSC-STEM4Health-group10/src/work/fit_multistart.py:21: RuntimeWarning: divide by zero encountered in log
+  return np.log(p)
+start0 cost 30.778 nfev 250 MAPE [18.51 24.85 13.96 14.85] mean 18.044
+start1 cost 10379.535 nfev 26 MAPE [ 94.93  79.55 336.37  68.88] mean 144.933
+start2 cost 30.696 nfev 67 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+  new best 30.696 (10s)
+start3 cost 39.494 nfev 197 MAPE [22.55 23.81 21.56 13.4 ] mean 20.332
+start4 cost 30.696 nfev 80 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start5 cost 616.439 nfev 250 MAPE [ 77.78  21.15 163.66  48.23] mean 77.704
+start6 cost 3139.179 nfev 250 MAPE [ 88.64 124.22  59.65  44.66] mean 79.295
+start7 cost 20409.099 nfev 10 MAPE [  328.76    67.29   143.57 30693.73] mean 7808.338
+start8 cost 30.733 nfev 70 MAPE [18.55 24.84 13.67 14.79] mean 17.963
+start9 cost 30.696 nfev 76 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start10 cost 3950.386 nfev 250 MAPE [  55.3   822.72 5602.3    91.81] mean 1643.032
+start11 cost 4339.612 nfev 10 MAPE [ 75.7   81.56 134.81  72.55] mean 91.156
+start12 cost 30.778 nfev 151 MAPE [18.5  24.85 13.97 14.86] mean 18.044
+start13 cost 30.731 nfev 135 MAPE [18.57 24.85 13.79 14.8 ] mean 18.001
+start14 cost 30.731 nfev 250 MAPE [18.57 24.85 13.79 14.8 ] mean 18.001
+start15 cost 30.696 nfev 82 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start16 cost 39.385 nfev 98 MAPE [22.72 23.82 21.2  13.26] mean 20.251
+start17 cost 39.495 nfev 112 MAPE [22.55 23.81 21.56 13.4 ] mean 20.332
+start18 cost 1719.730 nfev 63 MAPE [36.83 28.3  57.59 57.39] mean 45.028
+start19 cost 30.731 nfev 99 MAPE [18.57 24.85 13.79 14.8 ] mean 18.001
+start20 cost 30.696 nfev 79 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start21 cost 30.696 nfev 120 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start22 cost 30.696 nfev 68 MAPE [18.6  24.84 13.55 14.75] mean 17.936
+start23 cost 11193.346 nfev 17 MAPE [   48.98    30.82    38.13 14593.53] mean 3677.863
+start24 cost 30.778 nfev 229 MAPE [18.5  24.85 13.97 14.86] mean 18.044
+search done (81s), best cost 30.696
+polish-all cost 92.850 nfev 14 MAPE [19.81 25.31 14.89 14.17] mean 18.548
+polish-fine cost 92.818 nfev 16 MAPE [19.81 25.31 14.88 14.17] mean 18.545
+FINAL in-sample MAPE [18.788 26.491 15.247 14.409] mean 18.734
+params: {"mu_max": 2.64089, "Ks": 10.0, "Kx": 34.27416, "KiP": 1000000000.0, "kd0": 0.00813, "kd1": 1e-05, "KP": 0.02, "Yxs": 3.76829, "ms": 0.1009, "alpha": 0.46274, "beta": 0.02754, "qc": 1.57205, "KPc": 20.0, "g_fs": 339.27416, "g_fb": 63.71368, "g_fc": 230.32562, "g_fd": 157.4785, "h_fs": 0.0, "h_fb": 0.0, "h_fc": 0.0, "h_fd": 0.0}
+wrote params_ms.json

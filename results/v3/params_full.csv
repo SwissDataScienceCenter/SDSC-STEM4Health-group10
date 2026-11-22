@@ -1,0 +1,23 @@
+,estimate,ci95_low,ci95_high,at_bound,unit,meaning
+mu_max,11.163179137584006,1.195789634108132,104.21278534558873,False,1/d,maximum specific growth rate
+Ks,1.177622765474397,0.7098196219923352,1.9537292782511184,False,g/L,Monod half-saturation constant for substrate (growth)
+K_N,9.999999999999877,0.9035349690964728,110.67640259678798,True,N0,half-saturation of growth on the hidden nutrient
+Yxn,45.63757623457124,41.01829319011236,50.777060735144566,False,cells/N0,biomass yield on the hidden nutrient
+C_Nb,0.0001000000061893375,0.0,1.0142320547350045e+304,True,N0,hidden nutrient concentration in Feed B
+kd0,1.0000003858148416e-06,0.0,1.0142320547350045e+304,True,1/d,basal specific death rate
+kd_N,1.9999510541005938,7.173309247630214e-26,5.575953971480433e+25,True,1/d,extra death rate once the hidden nutrient is depleted (H1)
+K_dN,0.0002766707955168232,1.1015063350371088e-29,6.949277244904155e+21,False,N0,nutrient level below which H1 death kicks in
+kd_D,0.04580845323314155,1.1451154279269306e-07,18324.91586819156,False,1/(d * g/L d),death rate per unit of accumulated byproduct exposure (H2)
+k_r,9.983053825024863,2.8010970452461552e-05,3557940.4091865607,False,1/d,decay ('repair') rate of the byproduct damage
+k_lys,0.30826027845800513,0.1353422773794795,0.7021043321782792,False,1/d,lysis rate of dead cells
+Yxs,9999.999999950609,2.34276270450221e-110,4.268464740660222e+117,True,cells/g,biomass yield on substrate (growth part)
+m,0.06193105271914369,0.055575473143358506,0.06901345276913234,False,g/(cells d),maintenance substrate uptake
+q_ovf,4.999999999999998,0.6872703855223004,36.375785319195586,True,g/(cells d),maximum overflow uptake
+K_ovf,2.7063557158998854,2.612992426781659,2.803054913559458,False,g/L,substrate level for half-maximal overflow
+n_ovf,19.99999999999999,11.165199121839636,35.82560379219582,True,-,steepness (Hill coefficient) of the overflow switch
+K_iP,0.089625189523255,0.010259452805817993,0.782953511177922,False,g/L,byproduct level that halves the overflow (lactate shift)
+Yps,1.086215889812011,0.9978206130508718,1.1824419578511407,False,g/g,byproduct produced per substrate overflowed
+qPc,1.9999999999999998,0.44181752834868077,9.053511332948322,True,g/(cells d),maximum specific byproduct consumption
+K_Pc,27.335546978773724,5.406050963290566,138.22143625777406,False,g/L,half-saturation of byproduct consumption
+C_sub,1.000000000000004,1.000000000000004,1.000000000000004,True,g/L,substrate concentration in the substrate feed
+C_b,90.156428838729,83.52145216664108,97.31849064041114,False,g/L,substrate concentration in Feed B

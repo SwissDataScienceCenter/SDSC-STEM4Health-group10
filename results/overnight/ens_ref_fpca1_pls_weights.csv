@@ -1,0 +1,4 @@
+,vcd,tcd,substrate,byproduct
+ref_ridge_blend,0.0,0.0,1.0,0.7
+fpca_K1,0.8,0.8,0.0,0.3
+pls5,0.2,0.2,0.0,0.0

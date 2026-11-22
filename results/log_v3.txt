@@ -1,0 +1,97 @@
+  [v3 fold1] 500 simulations, current SSE/2 = 175.4
+  [v3 fold3] 500 simulations, current SSE/2 = 164.4
+  [v3 fold0] 500 simulations, current SSE/2 = 172.1
+  [v3 fold4] 500 simulations, current SSE/2 = 169.7
+  [v3 fold2] 500 simulations, current SSE/2 = 169.5
+  [v3 fold5] 500 simulations, current SSE/2 = 171.6
+  [v3 fold6] 500 simulations, current SSE/2 = 173.3
+  [v3 full] 500 simulations, current SSE/2 = 198.7
+  [v3 fold6] 1000 simulations, current SSE/2 = 168.1
+  [v3 fold3] 1000 simulations, current SSE/2 = 161.7
+  [v3 fold0] 1000 simulations, current SSE/2 = 169.9
+  [v3 fold1] 1000 simulations, current SSE/2 = 173.2
+  [v3 fold4] 1000 simulations, current SSE/2 = 167.4
+  [v3 fold5] 1000 simulations, current SSE/2 = 170.2
+  [v3 fold2] 1000 simulations, current SSE/2 = 168.4
+  [v3 full] 1000 simulations, current SSE/2 = 197.1
+  [v3 fold0] 1500 simulations, current SSE/2 = 169.4
+  [v3 fold1] 1500 simulations, current SSE/2 = 172.3
+  [v3 fold3] 1500 simulations, current SSE/2 = 161.1
+  [v3 fold6] 1500 simulations, current SSE/2 = 167.3
+  [v3 fold4] 1500 simulations, current SSE/2 = 167.0
+  [v3 fold5] 1500 simulations, current SSE/2 = 169.0
+  [v3 fold2] 1500 simulations, current SSE/2 = 168.2
+  [v3 full] 1500 simulations, current SSE/2 = 196.1
+  [v3 full] 2000 simulations, current SSE/2 = 195.8
+  [v3 fold2] 2000 simulations, current SSE/2 = 168.1
+  [v3 fold0] 2000 simulations, current SSE/2 = 169.2
+  [v3 fold1] 2000 simulations, current SSE/2 = 172.1
+  [v3 fold6] 2000 simulations, current SSE/2 = 167.0
+  [v3 fold3] 2000 simulations, current SSE/2 = 160.5
+  [v3 fold5] 2000 simulations, current SSE/2 = 168.9
+  [v3 fold4] 2000 simulations, current SSE/2 = 166.7
+  [v3 fold2] 2500 simulations, current SSE/2 = 168.1
+  [v3 fold1] 2500 simulations, current SSE/2 = 171.9
+  [v3 fold3] 2500 simulations, current SSE/2 = 160.5
+  [v3 fold5] 2500 simulations, current SSE/2 = 168.6
+  [v3 full] 2500 simulations, current SSE/2 = 195.5
+  [v3 fold6] 2500 simulations, current SSE/2 = 167.0
+  [v3 fold0] 2500 simulations, current SSE/2 = 169.0
+  [v3 fold4] 2500 simulations, current SSE/2 = 166.5
+  [v3 fold1] 3000 simulations, current SSE/2 = 171.8
+  [v3 fold2] 3000 simulations, current SSE/2 = 168.1
+  [v3 fold3] 3000 simulations, current SSE/2 = 160.4
+  [v3 fold5] 3000 simulations, current SSE/2 = 168.6
+  [v3 fold6] 3000 simulations, current SSE/2 = 166.9
+  [v3 full] 3000 simulations, current SSE/2 = 195.5
+  [v3 fold0] 3000 simulations, current SSE/2 = 168.9
+  [v3 fold4] 3000 simulations, current SSE/2 = 166.5
+[v3 fold3] DONE: fit on 42 batches in 1357s (cost 160.4)
+[v3 fold2] DONE: fit on 42 batches in 1360s (cost 168.1)
+  [v3 fold1] 3500 simulations, current SSE/2 = 171.8
+[v3 fold5] DONE: fit on 42 batches in 1394s (cost 168.6)
+  [v3 fold6] 3500 simulations, current SSE/2 = 166.9
+  [v3 full] 3500 simulations, current SSE/2 = 195.5
+  [v3 fold0] 3500 simulations, current SSE/2 = 168.9
+  [v3 fold4] 3500 simulations, current SSE/2 = 166.5
+  [v3 fold1] 4000 simulations, current SSE/2 = 171.8
+[v3 full] DONE: fit on 49 batches in 1497s (cost 195.5)
+[v3 fold6] DONE: fit on 42 batches in 1526s (cost 166.9)
+[v3 fold1] DONE: fit on 42 batches in 1563s (cost 171.8)
+  [v3 fold0] 4000 simulations, current SSE/2 = 168.9
+  [v3 fold4] 4000 simulations, current SSE/2 = 166.5
+[v3 fold0] DONE: fit on 42 batches in 1687s (cost 168.9)
+  [v3 fold4] 4500 simulations, current SSE/2 = 166.5
+[v3 fold4] DONE: fit on 42 batches in 1712s (cost 166.5)
+[v3] full fit: cost=195.5 nfev=175 success=True (1497s)
+          estimate  ci95_low      ci95_high  at_bound
+mu_max     11.1632    1.1958   1.042128e+02     False
+Ks          1.1776    0.7098   1.953700e+00     False
+K_N        10.0000    0.9035   1.106764e+02      True
+Yxn        45.6376   41.0183   5.077710e+01     False
+C_Nb        0.0001    0.0000  1.014232e+304      True
+kd0         0.0000    0.0000  1.014232e+304      True
+kd_N        2.0000    0.0000   5.575954e+25      True
+K_dN        0.0003    0.0000   6.949277e+21     False
+kd_D        0.0458    0.0000   1.832492e+04     False
+k_r         9.9831    0.0000   3.557940e+06     False
+k_lys       0.3083    0.1353   7.021000e-01     False
+Yxs     10000.0000    0.0000  4.268465e+117      True
+m           0.0619    0.0556   6.900000e-02     False
+q_ovf       5.0000    0.6873   3.637580e+01      True
+K_ovf       2.7064    2.6130   2.803100e+00     False
+n_ovf      20.0000   11.1652   3.582560e+01      True
+K_iP        0.0896    0.0103   7.830000e-01     False
+Yps         1.0862    0.9978   1.182400e+00     False
+qPc         2.0000    0.4418   9.053500e+00      True
+K_Pc       27.3355    5.4061   1.382214e+02     False
+C_sub       1.0000    1.0000   1.000000e+00      True
+C_b        90.1564   83.5215   9.731850e+01     False
+
+[v3] cross-validation (7 folds by batch):
+            RMSE  relRMSE_%  MARE_%
+vcd        2.460     11.876   8.584
+tcd        2.550     11.804   8.477
+dcd        0.235     26.609  32.851
+substrate  0.437     19.122  19.826
+byproduct  0.328     21.679  18.464
