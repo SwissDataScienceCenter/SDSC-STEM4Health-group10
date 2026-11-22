@@ -299,7 +299,12 @@ public class Fitter {
 
     /** Predict a single batch from its initial state + events only. Uses fixed-step RK4. */
     public RK4Simulator.SimResult predict(TrainingBatch batch, Map<String, Double> params) {
-        double tEnd = batch.times().isEmpty() ? 10 : batch.times().getLast() * 1.05;
+        // Use the later of: last measurement time or last event time
+        double lastMeasured = batch.times().isEmpty() ? 0 : batch.times().getLast();
+        double lastEvent = batch.events().stream()
+            .mapToDouble(Simulator.Event::time).max().orElse(0);
+        double tMax = Math.max(lastMeasured, lastEvent);
+        double tEnd = tMax > 1e-6 ? tMax * 1.05 : 10;
         return rk4.simulate(batch.initialState(), params, batch.events(), tEnd);
     }
 
@@ -354,6 +359,7 @@ public class Fitter {
 
         double[] residuals = new double[points.size()];
         double minVal = 1e-6;  // floor for log of small values
+        double maxResidual = 100.0;  // cap extreme residuals to prevent Inf in cost
 
         for (int i = 0; i < points.size(); i++) {
             ResidualPoint pt = points.get(i);
@@ -361,24 +367,25 @@ public class Fitter {
             if (sim == null) { residuals[i] = 0; continue; }
 
             BioreactorState s = nearestState(sim, pt.t());
+            if (s == null) { residuals[i] = maxResidual; continue; }
             double pred, obs;
 
             if (!Double.isNaN(pt.observedVcd())) {
                 pred = Math.max(s.xv(), minVal);
                 obs = Math.max(pt.observedVcd(), minVal);
-                residuals[i] = Math.log(pred) - Math.log(obs);
+                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
             } else if (!Double.isNaN(pt.observedTcd())) {
                 pred = Math.max(s.xv() + s.xd(), minVal);
                 obs = Math.max(pt.observedTcd(), minVal);
-                residuals[i] = Math.log(pred) - Math.log(obs);
+                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
             } else if (!Double.isNaN(pt.observedSub())) {
                 pred = Math.max(s.substrate(), minVal);
                 obs = Math.max(pt.observedSub(), minVal);
-                residuals[i] = Math.log(pred) - Math.log(obs);
+                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
             } else if (!Double.isNaN(pt.observedByp())) {
                 pred = Math.max(s.byproduct(), minVal);
                 obs = Math.max(pt.observedByp(), minVal);
-                residuals[i] = Math.log(pred) - Math.log(obs);
+                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
             }
         }
         return residuals;
@@ -393,14 +400,14 @@ public class Fitter {
         int n = spec.size();
         double[][] J = new double[m][n];
         double[] baseResiduals = computeResiduals(batches, params, points);
-        double h = 1e-6;
 
         for (int j = 0; j < n; j++) {
             ModelParameter p = spec.get(j);
             double orig = params.get(p.name());
-            double perturb = orig * (1 + h);
-            if (perturb == orig) perturb = orig + h;
-            perturb = Math.min(p.upperBound(), Math.max(p.lowerBound(), perturb));
+            // Use a relative + absolute perturbation: 1% of parameter range, min 1e-3
+            double h = Math.max(1e-3, (p.upperBound() - p.lowerBound()) * 0.01);
+            double perturb = Math.min(p.upperBound(), orig + h);
+            if (perturb <= orig) perturb = Math.max(p.lowerBound(), orig - h);
 
             Map<String, Double> perturbedParams = new HashMap<>(params);
             perturbedParams.put(p.name(), perturb);

@@ -115,13 +115,20 @@ public class DTBCsvReader {
                     volVals.add(vol);
                 }
 
-                // Feed events: only Feed B carries substrate (C, D are pH/antifoam)
-                if (!Double.isNaN(feedB) && feedB > 0) {
-                    events.add(Simulator.Event.feedBolus(t, feedB, Map.of("substrate", 120.0)));
+                // Feed events: use feed name so the model resolves concentrations
+                // including hidden nutrient N in Feed B
+                if (!Double.isNaN(feedB) && feedB > 0.01) {
+                    events.add(Simulator.Event.feedBolus(t, feedB, "feed_b"));
                 }
-                // Feed substrate events (rare but present)
-                if (!Double.isNaN(feedSub) && feedSub > 0) {
-                    events.add(Simulator.Event.feedBolus(t, feedSub, Map.of("substrate", 300.0)));
+                if (!Double.isNaN(feedC) && feedC > 0.01) {
+                    events.add(Simulator.Event.feedBolus(t, feedC, "feed_c"));
+                }
+                if (!Double.isNaN(feedD) && feedD > 0.01) {
+                    events.add(Simulator.Event.feedBolus(t, feedD, "feed_d"));
+                }
+                // Substrate feed events (rare but present)
+                if (!Double.isNaN(feedSub) && feedSub > 0.01) {
+                    events.add(Simulator.Event.feedBolus(t, feedSub, "substrate"));
                 }
 
                 // Volume sampling events (skip t=0 as that's initial state)
