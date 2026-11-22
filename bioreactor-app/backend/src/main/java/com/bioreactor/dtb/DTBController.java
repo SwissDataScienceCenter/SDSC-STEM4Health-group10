@@ -49,20 +49,19 @@ public class DTBController {
         // Use fitted defaults if no params provided
         Map<String, Double> params = new HashMap<>();
         if (allParams.isEmpty()) {
-            // Default DTB consensus params from Python fit
-            params.put("mu_max", 0.73);
-            params.put("K_s", 0.009);
-            params.put("Y_XS", 0.55);
-            params.put("m_s", 0.03);
-            params.put("alpha", 0.04);
-            params.put("beta", 0.0001);
-            params.put("k_d", 0.005);
-            params.put("k_lysis", 0.001);
-            params.put("feedB_S", 500.0);
+            // Use V3 model defaults (Python-fitted values)
+            var model = new DTBV3Model();
+            params = model.defaultParams();
         } else {
-            // Also do a fit to compute params
-            Fitter.FitResult r = service.fitOnTrainingData();
-            params = r.fittedParams();
+            // Parse user-provided parameters (any params from request)
+            for (var e : allParams.entrySet()) {
+                try { params.put(e.getKey(), Double.parseDouble(e.getValue())); } catch (NumberFormatException ignored) {}
+            }
+            // Fill missing with defaults
+            var model = new DTBV3Model();
+            for (var mp : model.parameters()) {
+                params.putIfAbsent(mp.name(), mp.startValue());
+            }
         }
 
         var outputs = service.generatePredictions(params);

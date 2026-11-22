@@ -21,7 +21,7 @@ public class DTBPredictionService {
 
     public DTBPredictionService(DataSource dataSource) {
         this.reader = new DTBDataReader(dataSource);
-        this.model = new DTBModel();
+        this.model = new DTBV3Model();  // Use V3 with Python-fitted defaults
         this.fitter = new Fitter(model);
     }
 
