@@ -85,6 +85,8 @@ public class Fitter {
 
         // Collect all (predicted, observed) pairs for residuals
         List<ResidualPoint> points = collectPoints(batches);
+        // Pre-compute per-variable scales (don't change between LM iterations)
+        double[] scales = computeScales(batches);
 
         MultivariateJacobianFunction modelFunc = point -> {
             double[] p = new double[spec.size()];
@@ -93,8 +95,8 @@ public class Fitter {
             }
 
             Map<String, Double> params = arrayToMap(spec, p);
-            double[] residuals = computeResiduals(batches, params, points);
-            double[][] jacobian = computeJacobian(spec, params, batches, points);
+            double[] residuals = computeResiduals(batches, params, points, scales);
+            double[][] jacobian = computeJacobian(spec, params, batches, points, scales);
 
             return new Pair<>(new ArrayRealVector(residuals),
                               new Array2DRowRealMatrix(jacobian));
@@ -205,6 +207,7 @@ public class Fitter {
         }
 
         List<ResidualPoint> points = collectPoints(batches);
+        double[] scales = computeScales(batches);
 
         MultivariateJacobianFunction modelFunc = point -> {
             double[] p = new double[spec.size()];
@@ -212,8 +215,8 @@ public class Fitter {
                 p[i] = spec.get(i).fromUnconstrained(point.getEntry(i));
             }
             Map<String, Double> params = arrayToMap(spec, p);
-            double[] residuals = computeResiduals(batches, params, points);
-            double[][] jacobian = computeJacobian(spec, params, batches, points);
+            double[] residuals = computeResiduals(batches, params, points, scales);
+            double[][] jacobian = computeJacobian(spec, params, batches, points, scales);
             return new Pair<>(new ArrayRealVector(residuals),
                               new Array2DRowRealMatrix(jacobian));
         };
@@ -354,21 +357,30 @@ public class Fitter {
     }
 
     /**
-     * Log residuals: log(pred) - log(obs) for each observation.
-     * This aligns the least-squares cost with MAPE (relative error metric).
-     * Ported from Python mechanistic.py fit(residual="log").
+     * Scaled linear residuals: (pred - obs) / scale for each variable.
+     * Uses per-variable standard deviation as the scale (Python default residual="scaled").
+     * This preserves the natural weighting of each variable — VCD (range 0-30)
+     * contributes more absolute error than substrate (range 0-5).
      */
     private double[] computeResiduals(List<TrainingBatch> batches,
                                        Map<String, Double> params,
                                        List<ResidualPoint> points) {
+        // Compute variable scales from the training observations
+        double[] scales = computeScales(batches);
+        return computeResiduals(batches, params, points, scales);
+    }
+
+    private double[] computeResiduals(List<TrainingBatch> batches,
+                                       Map<String, Double> params,
+                                       List<ResidualPoint> points,
+                                       double[] scales) {
         // Simulate all batches once
         Map<String, RK4Simulator.SimResult> simResults = new HashMap<>();
         for (var b : batches)
             simResults.put(b.id(), predict(b, params));
 
         double[] residuals = new double[points.size()];
-        double minVal = 1e-6;  // floor for log of small values
-        double maxResidual = 100.0;  // cap extreme residuals to prevent Inf in cost
+        double maxResidual = 100.0;  // cap extreme residuals to prevent instability
 
         for (int i = 0; i < points.size(); i++) {
             ResidualPoint pt = points.get(i);
@@ -377,38 +389,61 @@ public class Fitter {
 
             BioreactorState s = nearestState(sim, pt.t());
             if (s == null) { residuals[i] = maxResidual; continue; }
-            double pred, obs;
+            double pred, obs, scale;
 
             if (!Double.isNaN(pt.observedVcd())) {
-                pred = Math.max(s.xv(), minVal);
-                obs = Math.max(pt.observedVcd(), minVal);
-                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
+                pred = s.xv(); obs = pt.observedVcd(); scale = scales[0];
             } else if (!Double.isNaN(pt.observedTcd())) {
-                pred = Math.max(s.xv() + s.xd(), minVal);
-                obs = Math.max(pt.observedTcd(), minVal);
-                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
+                pred = s.xv() + s.xd(); obs = pt.observedTcd(); scale = scales[1];
             } else if (!Double.isNaN(pt.observedSub())) {
-                pred = Math.max(s.substrate(), minVal);
-                obs = Math.max(pt.observedSub(), minVal);
-                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
+                pred = s.substrate(); obs = pt.observedSub(); scale = scales[2];
             } else if (!Double.isNaN(pt.observedByp())) {
-                pred = Math.max(s.byproduct(), minVal);
-                obs = Math.max(pt.observedByp(), minVal);
-                residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, Math.log(pred) - Math.log(obs)));
+                pred = s.byproduct(); obs = pt.observedByp(); scale = scales[3];
+            } else {
+                residuals[i] = 0;
+                continue;
             }
+            if (scale < 1e-6) scale = 1e-6;
+            residuals[i] = Math.max(-maxResidual, Math.min(maxResidual, (pred - obs) / scale));
         }
         return residuals;
+    }
+
+    /** Compute per-variable standard deviations from training observations. */
+    private double[] computeScales(List<TrainingBatch> batches) {
+        double sumVcd = 0, sumTcd = 0, sumSub = 0, sumByp = 0;
+        double sum2Vcd = 0, sum2Tcd = 0, sum2Sub = 0, sum2Byp = 0;
+        int nVcd = 0, nTcd = 0, nSub = 0, nByp = 0;
+        for (var b : batches) {
+            for (int i = 0; i < b.times().size(); i++) {
+                double v = i < b.observedVCD().size() ? b.observedVCD().get(i) : Double.NaN;
+                double t = i < b.observedTCD().size() ? b.observedTCD().get(i) : Double.NaN;
+                double s = i < b.observedSubstrate().size() ? b.observedSubstrate().get(i) : Double.NaN;
+                double p = i < b.observedByproduct().size() ? b.observedByproduct().get(i) : Double.NaN;
+                if (!Double.isNaN(v)) { sumVcd += v; sum2Vcd += v * v; nVcd++; }
+                if (!Double.isNaN(t)) { sumTcd += t; sum2Tcd += t * t; nTcd++; }
+                if (!Double.isNaN(s)) { sumSub += s; sum2Sub += s * s; nSub++; }
+                if (!Double.isNaN(p)) { sumByp += p; sum2Byp += p * p; nByp++; }
+            }
+        }
+        return new double[] {
+            nVcd > 1 ? Math.sqrt((sum2Vcd - sumVcd * sumVcd / nVcd) / (nVcd - 1)) : 1.0,
+            nTcd > 1 ? Math.sqrt((sum2Tcd - sumTcd * sumTcd / nTcd) / (nTcd - 1)) : 1.0,
+            nSub > 1 ? Math.sqrt((sum2Sub - sumSub * sumSub / nSub) / (nSub - 1)) : 1.0,
+            nByp > 1 ? Math.sqrt((sum2Byp - sumByp * sumByp / nByp) / (nByp - 1)) : 1.0
+        };
     }
 
     /** Finite-difference Jacobian for the residuals. */
     private double[][] computeJacobian(List<ModelParameter> spec,
                                         Map<String, Double> params,
                                         List<TrainingBatch> batches,
-                                        List<ResidualPoint> points) {
+                                        List<ResidualPoint> points,
+                                        double[] scales) {
         int m = points.size();
         int n = spec.size();
         double[][] J = new double[m][n];
-        double[] baseResiduals = computeResiduals(batches, params, points);
+        double[] baseResiduals = computeResiduals(batches, params, points, scales);
 
         for (int j = 0; j < n; j++) {
             ModelParameter p = spec.get(j);
@@ -420,7 +455,7 @@ public class Fitter {
 
             Map<String, Double> perturbedParams = new HashMap<>(params);
             perturbedParams.put(p.name(), perturb);
-            double[] perturbedResiduals = computeResiduals(batches, perturbedParams, points);
+            double[] perturbedResiduals = computeResiduals(batches, perturbedParams, points, scales);
 
             for (int i = 0; i < m; i++) {
                 J[i][j] = (perturbedResiduals[i] - baseResiduals[i]) / (perturb - orig);

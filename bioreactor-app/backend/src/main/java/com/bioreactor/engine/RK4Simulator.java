@@ -135,7 +135,6 @@ public class RK4Simulator {
                 }
             }
 
-            // Record state at (k+1)*dt (after events)
             if ((k + 1) * dt <= tEnd) {
                 times.add((k + 1) * dt);
                 states.add(BioreactorState.fromStateVector((k + 1) * dt, x, hiddenCount).withVolume(V));
@@ -168,6 +167,8 @@ public class RK4Simulator {
             s0.byproduct() + frac * (s1.byproduct() - s0.byproduct()),
             s0.dissolvedO2(), s0.volume(), s0.temperature(), s0.pH(), h);
     }
+
+
 
     private static double[] add(double[] a, double[] b) {
         double[] r = new double[a.length];
