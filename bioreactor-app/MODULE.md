@@ -98,7 +98,6 @@ Java 7-fold CV matches Python within 0.1% (same protocol: scaled residuals, Pyth
 ## Known limitations
 
 - V3 holdout MAPE (15.3%) higher than CV (13.7%) — holdout batch selection accounts for difference
->>>>>>> 591ddfc (docs: add MAPE comparison table (Java 7-fold CV matches Python within 0.1%))
 - V3 model has 8/22 params at bounds — structural limit of current model form
 - V2 models (DTBModel, DTBModelImproved, DTBModelAdvanced) have 43–115% MAPE — deprecated
 - DTBDataReader expects V1 wide table (experiment_data) but code now uses V3 long format
