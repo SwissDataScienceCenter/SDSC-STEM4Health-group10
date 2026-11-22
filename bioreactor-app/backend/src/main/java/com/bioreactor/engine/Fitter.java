@@ -305,7 +305,16 @@ public class Fitter {
             .mapToDouble(Simulator.Event::time).max().orElse(0);
         double tMax = Math.max(lastMeasured, lastEvent);
         double tEnd = tMax > 1e-6 ? tMax * 1.05 : 10;
-        return rk4.simulate(batch.initialState(), params, batch.events(), tEnd);
+
+        // Ensure initial state has hidden states matching the model
+        BioreactorState ic = batch.initialState();
+        if (ic.hiddenCount() != model.hiddenStateCount()) {
+            ic = new BioreactorState(ic.time(), ic.xv(), ic.xd(),
+                ic.substrate(), ic.product(), ic.byproduct(),
+                ic.dissolvedO2(), ic.volume(), ic.temperature(), ic.pH(),
+                model.defaultHiddenState());
+        }
+        return rk4.simulate(ic, params, batch.events(), tEnd);
     }
 
     // --- private helpers ---

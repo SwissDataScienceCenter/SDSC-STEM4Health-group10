@@ -1,6 +1,7 @@
 package com.bioreactor.dtb;
 
 import com.bioreactor.engine.Fitter;
+import com.bioreactor.service.DTBImportService;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,9 +14,38 @@ import java.util.*;
 public class DTBController {
 
     private final DTBPredictionService service;
+    private final DTBImportService importService;
 
-    public DTBController(DTBPredictionService service) {
+    public DTBController(DTBPredictionService service, DTBImportService importService) {
         this.service = service;
+        this.importService = importService;
+    }
+
+    /** Import DTB CSV data into the V3 run data store. */
+    @PostMapping("/import")
+    public ResponseEntity<?> importData(@RequestParam(defaultValue = "/home/renku/work/input-data/Project 1 - DTB/bioreaction_remaining.csv") String csvPath) {
+        try {
+            int count = importService.importAll(csvPath);
+            return ResponseEntity.ok(Map.of(
+                "batches_imported", count,
+                "readings", importService.getReadingCount(),
+                "events", importService.getEventCount()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Get status of imported data. */
+    @GetMapping("/status")
+    public ResponseEntity<?> status() {
+        return ResponseEntity.ok(Map.of(
+            "runs", importService.getRunCount(),
+            "readings", importService.getReadingCount(),
+            "events", importService.getEventCount(),
+            "batch_ids", importService.getDTBBatchIds()
+        ));
     }
 
     /** DTO for fit response. */

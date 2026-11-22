@@ -40,7 +40,8 @@ class RealDataV3FitTest {
         for (var b : train) {
             BioreactorState ic = new BioreactorState(0, b.initialState().xv(), 0,
                 b.initialState().substrate(), 0, b.initialState().byproduct(),
-                0.007, b.initialState().volume(), 37.0, 7.0, new double[]{1.0, 0.0});
+                0.007, b.initialState().volume(), 37.0, 7.0,
+                cModel.defaultHiddenState());
             cBatches.add(new Fitter.TrainingBatch(b.batchId(), ic, b.events(),
                 b.measurementTimes(), b.measurements().getOrDefault("vcd", List.of()),
                 b.measurements().getOrDefault("tcd", List.of()),

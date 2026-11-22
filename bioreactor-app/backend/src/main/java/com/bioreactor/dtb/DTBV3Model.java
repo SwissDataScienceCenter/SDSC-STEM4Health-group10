@@ -34,6 +34,8 @@ public class DTBV3Model implements ProcessModel {
         return 2;
     }
 
+    @Override public double[] defaultHiddenState() { return new double[]{1.0, 0.0}; }
+
     /** Indices of hidden states that are NOT diluted by feeds. D is culture history. */
     @Override
     public Set<Integer> undilutedHiddenIndices() {
