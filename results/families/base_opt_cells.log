@@ -1,0 +1,23 @@
+evaporation/withdrawal fit on late intervals: hidden = -0.0201 -0.0312 * dt
+== VCD / TCD per-time ridge ==
+none vcd         seeds 0-2 6.924 | 3-5 6.954
+none tcd         seeds 0-2 6.851 | 3-5 6.882
+c345 vcd         seeds 0-2 6.960 | 3-5 6.986
+c345 tcd         seeds 0-2 6.891 | 3-5 6.921
+c2345 vcd        seeds 0-2 6.938 | 3-5 6.964
+c2345 tcd        seeds 0-2 6.864 | 3-5 6.887
+h2 vcd           seeds 0-2 6.925 | 3-5 6.956
+h2 tcd           seeds 0-2 6.853 | 3-5 6.885
+b12 vcd          seeds 0-2 6.940 | 3-5 6.967
+b12 tcd          seeds 0-2 6.874 | 3-5 6.899
+c12345 vcd       seeds 0-2 6.950 | 3-5 6.976
+c12345 tcd       seeds 0-2 6.886 | 3-5 6.900
+== VCD / TCD pooled SVR (sel) ==
+svr none vcd     seeds 0-2 6.603 | 3-5 6.601
+svr none tcd     seeds 0-2 6.546 | 3-5 6.526
+svr c2345 vcd    seeds 0-2 6.582 | 3-5 6.628
+svr c2345 tcd    seeds 0-2 6.481 | 3-5 6.536
+svr h2 vcd       seeds 0-2 6.608 | 3-5 6.624
+svr h2 tcd       seeds 0-2 6.497 | 3-5 6.501
+svr c345 vcd     seeds 0-2 6.577 | 3-5 6.648
+svr c345 tcd     seeds 0-2 6.514 | 3-5 6.565

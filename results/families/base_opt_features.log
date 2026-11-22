@@ -1,0 +1,37 @@
+evaporation/withdrawal fit on late intervals: hidden = -0.0201 -0.0312 * dt
+
+== BYPRODUCT (note's Huber model) ==
+none             seeds 0-2 8.688 | 3-5 8.657
+b345             seeds 0-2 7.918 | 3-5 7.836
+b2345            seeds 0-2 8.122 | 3-5 8.058
+b12345           seeds 0-2 8.311 | 3-5 8.268
+b3456            seeds 0-2 8.277 | 3-5 8.262
+b34              seeds 0-2 8.469 | 3-5 8.448
+h3,h4,h5         seeds 0-2 8.161 | 3-5 7.993
+b345+h2          seeds 0-2 8.035 | 3-5 7.912
+b345+b12         seeds 0-2 8.005 | 3-5 7.911
+c345             seeds 0-2 7.901 | 3-5 7.818
+c2345            seeds 0-2 8.113 | 3-5 8.040
+c12345           seeds 0-2 8.322 | 3-5 8.271
+r345             seeds 0-2 7.942 | 3-5 7.831
+b345+late_mean   seeds 0-2 7.983 | 3-5 7.912
+b345+blate       seeds 0-2 7.858 | 3-5 7.892
+c345+clate       seeds 0-2 7.844 | 3-5 7.867
+
+== SUBSTRATE (per-time ridge) ==
+none             seeds 0-2 7.095 | 3-5 7.309
+b345             seeds 0-2 6.933 | 3-5 7.124
+b2345            seeds 0-2 6.720 | 3-5 6.922
+b12345           seeds 0-2 6.937 | 3-5 7.137
+b3456            seeds 0-2 7.064 | 3-5 7.263
+b34              seeds 0-2 7.233 | 3-5 7.427
+h3,h4,h5         seeds 0-2 7.171 | 3-5 7.419
+b345+h2          seeds 0-2 6.891 | 3-5 7.081
+b345+b12         seeds 0-2 7.063 | 3-5 7.235
+c345             seeds 0-2 6.934 | 3-5 7.130
+c2345            seeds 0-2 6.721 | 3-5 6.908
+c12345           seeds 0-2 6.930 | 3-5 7.130
+r345             seeds 0-2 6.908 | 3-5 7.121
+b345+late_mean   seeds 0-2 7.113 | 3-5 7.321
+b345+blate       seeds 0-2 7.164 | 3-5 7.362
+c345+clate       seeds 0-2 7.150 | 3-5 7.348

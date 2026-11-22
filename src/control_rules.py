@@ -54,3 +54,54 @@ class SubstrateControlRule:
         p.loc[p.j == jt, "substrate"] = self.c_trig
         p.loc[p.j == jt + 1, "substrate"] = self.c_after
         return p
+
+
+# --------------------------------------------------------------------------
+# Late substrate doses (after samples 11 and 12): two dose levels that reveal the measured substrate
+# --------------------------------------------------------------------------
+# Every batch gets a substrate bolus ~0.5 day after samples 11 and 12. Its size per volume takes only two
+# values: 0.006 x V when the substrate measured at that sample was below ~0.96, 0.004 x V otherwise (a few
+# exceptions). The dose class of a test batch is known from its feed profile, so the substrate predicted at
+# samples 11 / 12 is clipped to the side of the threshold given by the dose:
+#     big dose   -> S(j) <= cap   = quantile (1 - Q) of the training S(j) of big-dose samples
+#     small dose -> S(j) >= floor = quantile Q of the training S(j) of small-dose samples
+# Q = 0.2 chosen on CV seeds 0-2 (substrate MAPE -0.116), confirmed on fresh seeds 3-5 (-0.169).
+LATE_SAMPLES = (11, 12)
+BIG_DOSE_PER_V = 0.005
+
+
+def late_dose_classes(raw: pd.DataFrame) -> pd.Series:
+    """(batch_id, j) -> True if the substrate dose after sample j (j = 11, 12) is the big one."""
+    samp = D.measurements(raw, include_to_predict=True)
+    samp["j"] = samp.groupby("batch_id").cumcount()
+    f = D.feeds_long(raw)
+    f = f[f.feed == "feed_substrate"].sort_values("elapsed_time")
+    f = pd.merge_asof(f, samp[["batch_id", "elapsed_time", "j", "volume"]].rename(columns={"elapsed_time": "t_s"})
+                      .sort_values("t_s"), left_on="elapsed_time", right_on="t_s", by="batch_id", direction="backward")
+    f = f[f.j.isin(LATE_SAMPLES)]
+    return (f.amount / f.volume > BIG_DOSE_PER_V).set_axis(pd.MultiIndex.from_arrays([f.batch_id, f.j]))
+
+
+class LateDoseRule:
+    def __init__(self, q: float = 0.2):
+        self.q = q
+
+    def fit(self, raw: pd.DataFrame, train_ids: list[str]):
+        self.big = late_dose_classes(raw)
+        m = D.measurements(raw)
+        m["j"] = m.groupby("batch_id").cumcount()
+        s = m.set_index(["batch_id", "j"]).substrate
+        idx = [(b, j) for b in train_ids for j in LATE_SAMPLES]
+        y, c = s.loc[idx], self.big.loc[idx].to_numpy()
+        self.cap, self.floor = float(y[c].quantile(1 - self.q)), float(y[~c].quantile(self.q))
+        return self
+
+    def apply(self, pred: pd.DataFrame) -> pd.DataFrame:
+        """pred: batch_id, j, substrate (+ other columns). Returns a corrected copy."""
+        p = pred.copy()
+        for i, (b, j) in enumerate(zip(p.batch_id, p.j)):
+            if (b, j) in self.big.index:
+                k = p.index[i]
+                p.loc[k, "substrate"] = (min(p.loc[k, "substrate"], self.cap) if self.big.loc[(b, j)]
+                                         else max(p.loc[k, "substrate"], self.floor))
+        return p
