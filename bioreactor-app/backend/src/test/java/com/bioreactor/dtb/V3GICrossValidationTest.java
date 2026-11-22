@@ -1,6 +1,7 @@
 package com.bioreactor.dtb;
 
 import com.bioreactor.engine.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -10,6 +11,7 @@ import java.util.*;
  * Both use scaled residuals and Python-fitted defaults as initial guess.
  * Tagged @Tag("slow") — ~4 minutes.
  */
+@Tag("slow")
 class V3GICrossValidationTest {
 
     private static final String CSV_PATH = "/home/renku/work/input-data/Project 1 - DTB/bioreaction_remaining.csv";
