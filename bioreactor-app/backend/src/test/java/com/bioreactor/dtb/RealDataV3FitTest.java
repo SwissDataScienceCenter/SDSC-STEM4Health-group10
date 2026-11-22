@@ -32,27 +32,31 @@ class RealDataV3FitTest {
         System.out.println("  Training batches: " + train.size() + " | Test batches: " + test.size());
         System.out.println("=".repeat(80));
 
-        // Convert to Fitter training batches
-        List<Fitter.TrainingBatch> fitBatches = new ArrayList<>();
+        System.out.println("\n  --- V3 Constrained (12 params) ---");
+        // Use constrained model (12 free params + 10 locked to literature)
+        var cModel = new DTBV3ConstrainedModel();
+        var cFitter = new Fitter(cModel);
+        List<Fitter.TrainingBatch> cBatches = new ArrayList<>();
         for (var b : train) {
-            fitBatches.add(toFitBatch(b));
+            BioreactorState ic = new BioreactorState(0, b.initialState().xv(), 0,
+                b.initialState().substrate(), 0, b.initialState().byproduct(),
+                0.007, b.initialState().volume(), 37.0, 7.0, new double[]{1.0, 0.0});
+            cBatches.add(new Fitter.TrainingBatch(b.batchId(), ic, b.events(),
+                b.measurementTimes(), b.measurements().getOrDefault("vcd", List.of()),
+                b.measurements().getOrDefault("tcd", List.of()),
+                b.measurements().getOrDefault("substrate", List.of()),
+                b.measurements().getOrDefault("byproduct", List.of())));
         }
+        // Fit on all 49 training batches, 10% holdout for validation
+        Collections.shuffle(cBatches, new Random(42));
+        int nHold = Math.max(5, cBatches.size() / 10);
+        List<Fitter.TrainingBatch> ct = cBatches.subList(0, cBatches.size() - nHold);
+        List<Fitter.TrainingBatch> ch = cBatches.subList(cBatches.size() - nHold, cBatches.size());
+        System.out.println("  Fit on: " + ct.size() + " | Holdout: " + ch.size());
 
-        // Use a small subset for fast iteration (5 fit, 3 holdout)
-        Collections.shuffle(fitBatches, new Random(42));
-        List<Fitter.TrainingBatch> fitTrain = fitBatches.subList(0, Math.min(5, fitBatches.size()));
-        List<Fitter.TrainingBatch> fitHold = fitBatches.subList(
-            Math.min(5, fitBatches.size()),
-            Math.min(8, fitBatches.size()));
-
-        System.out.println("  Fit on: " + fitTrain.size() + " | Holdout: " + fitHold.size());
-
-        var model = new DTBV3Model();
-        var fitter = new Fitter(model);
-
-        System.out.println("\n  Fitting V3 (22 params), single start, 100 function evals...");
+        System.out.println("  Fitting constrained (12 params), single start, 1000 evals...");
         long startMs = System.currentTimeMillis();
-        Fitter.FitResult fit = fitter.fit(fitTrain, 100);
+        Fitter.FitResult fit = cFitter.fit(ct, 1000);
         long elapsed = (System.currentTimeMillis() - startMs) / 1000;
 
         System.out.println("  Time: " + elapsed + "s | Converged: " + fit.converged() +
@@ -60,15 +64,10 @@ class RealDataV3FitTest {
 
         // Report fitted params
         System.out.println("\n  FITTED PARAMETERS:");
-        List<String> keyParams = List.of(
-            "mu_max", "Ks", "K_N", "Yxn", "Yxs", "m", "kd0", "kd_N", "k_lys",
-            "q_ovf", "K_ovf", "n_ovf", "K_iP", "Yps", "qPc", "K_Pc", "k_r", "kd_D"
-        );
-        for (String key : keyParams) {
-            Double val = fit.fittedParams().get(key);
-            Double startVal = fit.startParams().get(key);
+        for (var mp : cModel.parameters()) {
+            Double val = fit.fittedParams().get(mp.name());
             if (val != null) {
-                System.out.printf("    %-12s = %12.6f  (start: %12.6f)%n", key, val, startVal);
+                System.out.printf("    %-12s = %12.6f  (start: %12.6f)%n", mp.name(), val, mp.startValue());
             }
         }
 
@@ -78,8 +77,8 @@ class RealDataV3FitTest {
         int[] counts = new int[4];
         String[] labels = {"VCD", "TCD", "Substrate", "Byproduct"};
 
-        for (var hb : fitHold) {
-            var pred = fitter.predict(hb, fit.fittedParams());
+        for (var hb : ch) {
+            var pred = cFitter.predict(hb, fit.fittedParams());
             for (int i = 1; i < hb.times().size(); i++) {
                 double t = hb.times().get(i);
                 var sim = nearestState(pred, t);
@@ -115,17 +114,6 @@ class RealDataV3FitTest {
         System.out.println("\n  REFERENCE (Python V3, 10-fold CV on 49 train):");
         System.out.println("    VCD=8.6%  TCD=8.5%  Substrate=19.8%  Byproduct=18.5%  Mean=13.8%");
         System.out.println("=".repeat(80) + "\n");
-    }
-
-    private Fitter.TrainingBatch toFitBatch(DTBCsvReader.DTBBatch b) {
-        var vcd = b.measurements().getOrDefault("vcd", List.of());
-        var tcd = b.measurements().getOrDefault("tcd", List.of());
-        var sub = b.measurements().getOrDefault("substrate", List.of());
-        var byp = b.measurements().getOrDefault("byproduct", List.of());
-        return new Fitter.TrainingBatch(
-            b.batchId(), b.initialState(), b.events(),
-            b.measurementTimes(), vcd, tcd, sub, byp
-        );
     }
 
     private static BioreactorState nearestState(RK4Simulator.SimResult r, double t) {
