@@ -48,8 +48,9 @@ cd bioreactor-app/backend
 
 ## Verified
 
-- [x] 14 tests pass: EngineTest(5) + PythonPortTest(2) + DTBV3ModelPortTest(5)
-       + RealDataV3FitTest(1) + RealDataFitTest(1)
+- [x] 24 tests pass: EngineTest(5) + PythonPortTest(2) + DTBV3ModelPortTest(5)
+       + RealDataV3FitTest(1) + RealDataFitTest(1) + EngineIntegrationTest(3)
+       + ModelVariantComparisonTest(6) + V3GIModelComparisonTest(1)
 - [x] Simulator uses model.rates() correctly
 - [x] Bolus mass balance (feed + volume reset)
 - [x] Fitter converges on synthetic data (Levenberg-Marquardt)
@@ -88,5 +89,6 @@ cd bioreactor-app/backend
 - V3 model has 8/22 params at bounds — structural limit of current model form
 - V2 models (DTBModel, DTBModelImproved, DTBModelAdvanced) have 43–115% MAPE — deprecated
 - DTBDataReader expects V1 wide table (experiment_data) but code now uses V3 long format
+- springdoc-openapi added (v2.7.0) — OpenAPI docs at /v3/api-docs and /swagger-ui.html
 - BRPMM mapping file not started (lowest priority per original brief)
 - Full leave-one-batch-out CV on all 49 training batches not run (expensive)
